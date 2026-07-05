@@ -1,0 +1,22 @@
+services:
+  market-message:
+    build: .
+    container_name: market-message
+    environment:
+      WARFRAME_MARKET_EMAIL: ${WARFRAME_MARKET_EMAIL:-}
+      WARFRAME_MARKET_LOGIN: ${WARFRAME_MARKET_LOGIN:-}
+      WARFRAME_MARKET_PASSWORD: ${WARFRAME_MARKET_PASSWORD:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-30}
+      STATE_PATH: ${STATE_PATH:-/app/data/state.sqlite}
+      WARFRAME_MARKET_PLATFORM: ${WARFRAME_MARKET_PLATFORM:-pc}
+      WARFRAME_MARKET_LANGUAGE: ${WARFRAME_MARKET_LANGUAGE:-en}
+      WARFRAME_MARKET_CROSSPLAY: ${WARFRAME_MARKET_CROSSPLAY:-true}
+      WARFRAME_MARKET_BASE_URL: ${WARFRAME_MARKET_BASE_URL:-https://warframe.market}
+      WARFRAME_MARKET_API_BASE_URL: ${WARFRAME_MARKET_API_BASE_URL:-https://api.warframe.market/v1}
+      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org}
+      REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-20}
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
