@@ -36,6 +36,7 @@ def main() -> int:
 
     try:
         _login_until_success(warframe, config.poll_interval_seconds, logger)
+        _send_startup_notification(telegram, config.poll_interval_seconds, logger)
         logger.info("Polling every %s seconds", config.poll_interval_seconds)
         while True:
             try:
@@ -54,6 +55,20 @@ def main() -> int:
     finally:
         warframe.close()
         telegram.close()
+
+
+def _send_startup_notification(
+    telegram: TelegramClient,
+    poll_interval_seconds: int,
+    logger: logging.Logger,
+) -> None:
+    try:
+        telegram.send_message(
+            "Warframe Market Telegram forwarder started\n"
+            f"Polling every {poll_interval_seconds} seconds"
+        )
+    except Exception:
+        logger.exception("Telegram startup notification failed; continuing")
 
 
 def _login_until_success(
