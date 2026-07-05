@@ -7,7 +7,7 @@
 - Логин: `POST https://api.warframe.market/v1/auth/signin` с email/password и стабильным `device_id`.
 - Проверка: `GET https://api.warframe.market/v1/im/chats`.
 - Загрузка сообщений: `GET https://api.warframe.market/v1/im/chats/{chat_id}` для чатов с `unread_count > 0`.
-- Дедупликация: SQLite хранит уже отправленные `message_id` в `data/state.sqlite`.
+- Дедупликация: SQLite хранит уже отправленные `message_id` в Docker volume `market-message-data`.
 - Отправка: Telegram Bot API `sendMessage`.
 
 ## Быстрый старт
@@ -60,13 +60,14 @@ docker compose logs -f market-message
 
 ## Сброс состояния
 
-Чтобы сервис снова мог отправить сообщения, которые уже были отмечены как доставленные, остановите контейнер и удалите SQLite-файл:
+Чтобы сервис снова мог отправить сообщения, которые уже были отмечены как доставленные, остановите контейнер и удалите Docker volume:
 
 ```bash
-docker compose down
-rm -f data/state.sqlite
+docker compose down -v
 docker compose up -d
 ```
+
+Если вы меняли `docker-compose.yml` и подключали `./data:/app/data`, верните named volume. На некоторых host filesystem SQLite не может корректно открыть database file через bind mount и падает с `unable to open database file`.
 
 ## Разработка
 
@@ -89,7 +90,7 @@ python -m market_message
 - `Warframe Market login failed`: проверьте логин/пароль, верификацию аккаунта и доступность Warframe Market.
 - `Warframe Market session expired`: сервис перелогинится автоматически.
 - `Telegram returned ...`: проверьте token, `TELEGRAM_CHAT_ID` и право бота писать в выбранный чат.
-- Повторные уведомления после перезапуска обычно означают, что не сохраняется volume `./data:/app/data`.
+- Повторные уведомления после перезапуска обычно означают, что удален или не подключен Docker volume `market-message-data`.
 
 ## Ограничения
 
