@@ -22,4 +22,4 @@ services:
       - market-message-data:/app/data
 
 volumes:
-  market-message-data
+  market-message-data:
