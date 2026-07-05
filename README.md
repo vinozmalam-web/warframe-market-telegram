@@ -1,6 +1,6 @@
 # Warframe Market Telegram Forwarder
 
-Сервис логинится в `warframe.market`, регулярно проверяет входящие сообщения и пересылает новые входящие сообщения в Telegram. Уведомление содержит отправителя, текст сообщения и ссылку для быстрого перехода в чат.
+Сервис логинится в `warframe.market`, регулярно проверяет входящие сообщения и пересылает новые входящие сообщения в Telegram. Уведомление содержит отправителя, текст сообщения и ссылку для быстрого перехода в чат. Чтобы ответить в Warframe Market из Telegram, используйте функцию reply на конкретное уведомление от бота. Обычное сообщение в чат с ботом не отправляется в Warframe Market.
 
 ## Как это работает
 
@@ -9,6 +9,7 @@
 - Загрузка сообщений: `GET https://api.warframe.market/v1/im/chats/{chat_id}` для чатов с `unread_count > 0`.
 - Дедупликация: SQLite хранит уже отправленные `message_id` в Docker volume `market-message-data`.
 - Отправка: Telegram Bot API `sendMessage`.
+- Ответы: сервис читает Telegram Bot API `getUpdates`, принимает только сообщения, отправленные через reply на уведомление от бота, и отправляет их в Warframe Market через WebSocket chat action.
 
 ## Быстрый старт
 
@@ -90,6 +91,7 @@ python -m market_message
 - `Warframe Market login failed`: проверьте логин/пароль, верификацию аккаунта и доступность Warframe Market.
 - `Warframe Market session expired`: сервис перелогинится автоматически.
 - `Telegram returned ...`: проверьте token, `TELEGRAM_CHAT_ID` и право бота писать в выбранный чат.
+- Если ответ из Telegram не дошел до Warframe Market, убедитесь, что вы отвечаете именно через reply на уведомление от бота, а не пишете новое сообщение в чат.
 - Повторные уведомления после перезапуска обычно означают, что удален или не подключен Docker volume `market-message-data`.
 
 ## Ограничения

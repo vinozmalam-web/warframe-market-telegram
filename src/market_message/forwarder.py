@@ -4,7 +4,7 @@ from html import unescape
 from html.parser import HTMLParser
 from typing import Protocol
 
-from .models import IncomingMessage
+from .models import IncomingMessage, TelegramUpdate
 from .state import StateStore
 from .warframe import extract_chats, extract_messages
 
@@ -20,9 +20,15 @@ class WarframeLike(Protocol):
     def get_chat(self, chat_id: str) -> dict:
         ...
 
+    def send_chat_message(self, chat_id: str, text: str) -> None:
+        ...
+
 
 class TelegramLike(Protocol):
-    def send_message(self, text: str) -> None:
+    def send_message(self, text: str) -> int | None:
+        ...
+
+    def get_updates(self, offset: int | None = None) -> list[TelegramUpdate]:
         ...
 
 
@@ -62,9 +68,43 @@ class MessageForwarder:
             for message in candidates:
                 if self.state.was_message_sent(message.id):
                     continue
-                self.telegram.send_message(format_telegram_message(message, self.market_base_url))
+                telegram_message_id = self.telegram.send_message(
+                    format_telegram_message(message, self.market_base_url)
+                )
+                if telegram_message_id is not None:
+                    self.state.link_telegram_message(
+                        telegram_message_id=telegram_message_id,
+                        warframe_message_id=message.id,
+                        chat_id=message.chat_id,
+                    )
                 self.state.mark_message_sent(message.id, message.chat_id)
                 sent_count += 1
+
+        return sent_count
+
+    def forward_replies(self) -> int:
+        sent_count = 0
+        updates = self.telegram.get_updates(offset=self.state.get_telegram_update_offset())
+
+        for update in updates:
+            message = update.message
+            if message is None:
+                self.state.set_telegram_update_offset(update.update_id + 1)
+                continue
+
+            text = (message.text or "").strip()
+            if message.reply_to_message_id is None or not text:
+                self.state.set_telegram_update_offset(update.update_id + 1)
+                continue
+
+            chat_id = self.state.chat_id_for_telegram_message(message.reply_to_message_id)
+            if chat_id is None:
+                self.state.set_telegram_update_offset(update.update_id + 1)
+                continue
+
+            self.warframe.send_chat_message(chat_id, text)
+            self.state.set_telegram_update_offset(update.update_id + 1)
+            sent_count += 1
 
         return sent_count
 

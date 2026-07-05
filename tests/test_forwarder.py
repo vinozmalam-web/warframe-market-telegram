@@ -6,6 +6,7 @@ class FakeWarframeMarketClient:
     current_user_id = "me"
 
     def __init__(self):
+        self.sent_replies = []
         self.chat_payload = {
             "payload": {
                 "chats": [
@@ -50,13 +51,21 @@ class FakeWarframeMarketClient:
         assert chat_id == "chat-1"
         return self.messages_payload
 
+    def send_chat_message(self, chat_id, text):
+        self.sent_replies.append((chat_id, text))
+
 
 class FakeTelegramClient:
     def __init__(self):
         self.sent_messages = []
+        self.updates = []
 
     def send_message(self, text):
         self.sent_messages.append(text)
+        return len(self.sent_messages) + 9000
+
+    def get_updates(self, offset=None):
+        return self.updates
 
 
 class FailingTelegramClient:
@@ -83,6 +92,8 @@ def test_forwarder_sends_only_unread_incoming_messages_once(tmp_path):
     assert "first" in telegram.sent_messages[0]
     assert "second" in telegram.sent_messages[1]
     assert "my reply" not in "\n".join(telegram.sent_messages)
+    assert state.chat_id_for_telegram_message(9001) == "chat-1"
+    assert state.chat_id_for_telegram_message(9002) == "chat-1"
 
 
 def test_forwarder_does_not_mark_message_sent_when_telegram_fails(tmp_path):
@@ -101,3 +112,41 @@ def test_forwarder_does_not_mark_message_sent_when_telegram_fails(tmp_path):
 
     assert not state.was_message_sent("incoming-1")
     assert not state.was_message_sent("incoming-2")
+
+
+def test_forwarder_sends_only_telegram_replies_to_linked_messages(tmp_path):
+    class Message:
+        def __init__(self, text, reply_to_message_id=None):
+            self.text = text
+            self.reply_to_message_id = reply_to_message_id
+
+    class Update:
+        def __init__(self, update_id, message):
+            self.update_id = update_id
+            self.message = message
+
+    state = StateStore(tmp_path / "state.sqlite")
+    state.link_telegram_message(
+        telegram_message_id=9001,
+        warframe_message_id="incoming-1",
+        chat_id="chat-1",
+    )
+    warframe = FakeWarframeMarketClient()
+    telegram = FakeTelegramClient()
+    telegram.updates = [
+        Update(40, Message("plain message")),
+        Update(41, Message("unknown reply", reply_to_message_id=9999)),
+        Update(42, Message("reply text", reply_to_message_id=9001)),
+    ]
+    forwarder = MessageForwarder(
+        warframe=warframe,
+        telegram=telegram,
+        state=state,
+        market_base_url="https://warframe.market",
+    )
+
+    sent_count = forwarder.forward_replies()
+
+    assert sent_count == 1
+    assert warframe.sent_replies == [("chat-1", "reply text")]
+    assert state.get_telegram_update_offset() == 43

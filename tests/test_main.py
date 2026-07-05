@@ -57,11 +57,19 @@ class FakeWarframeMarketClient:
 
 
 class StoppingForwarder:
+    instances = []
+
     def __init__(self, warframe, telegram, state, market_base_url):
         self.warframe = warframe
         self.telegram = telegram
         self.state = state
         self.market_base_url = market_base_url
+        self.forward_replies_calls = 0
+        self.__class__.instances.append(self)
+
+    def forward_replies(self):
+        self.forward_replies_calls += 1
+        return 1
 
     def poll_once(self):
         raise KeyboardInterrupt
@@ -78,6 +86,7 @@ def configure_main(monkeypatch, tmp_path, telegram_cls):
     monkeypatch.setattr(app, "StateStore", FakeStateStore)
     monkeypatch.setattr(app, "WarframeMarketClient", FakeWarframeMarketClient)
     monkeypatch.setattr(app, "TelegramClient", telegram_cls)
+    StoppingForwarder.instances = []
     monkeypatch.setattr(app, "MessageForwarder", StoppingForwarder)
 
 
@@ -104,3 +113,12 @@ def test_main_logs_and_continues_when_startup_notification_fails(
 
     assert result == 0
     assert "Telegram startup notification failed; continuing" in caplog.text
+
+
+def test_main_processes_telegram_replies_before_polling_warframe(monkeypatch, tmp_path):
+    configure_main(monkeypatch, tmp_path, FakeTelegramClient)
+
+    result = app.main()
+
+    assert result == 0
+    assert StoppingForwarder.instances[0].forward_replies_calls == 1

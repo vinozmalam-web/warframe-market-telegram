@@ -17,3 +17,17 @@ class IncomingMessage:
     sender_name: str
     text: str
     sent_at: str | None
+
+
+@dataclass(frozen=True)
+class TelegramIncomingMessage:
+    message_id: int
+    chat_id: str
+    text: str | None
+    reply_to_message_id: int | None
+
+
+@dataclass(frozen=True)
+class TelegramUpdate:
+    update_id: int
+    message: TelegramIncomingMessage | None
