@@ -19,4 +19,7 @@ services:
       REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-20}
     restart: unless-stopped
     volumes:
-      - ./data:/app/data
+      - market-message-data:/app/data
+
+volumes:
+  market-message-data
