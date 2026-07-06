@@ -29,6 +29,49 @@ class StateStore:
                 (message_id, chat_id),
             )
 
+    def link_telegram_message(
+        self,
+        telegram_message_id: int,
+        warframe_message_id: str,
+        chat_id: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO telegram_message_links (
+                    telegram_message_id,
+                    warframe_message_id,
+                    chat_id
+                )
+                VALUES (?, ?, ?)
+                """,
+                (telegram_message_id, warframe_message_id, chat_id),
+            )
+
+    def chat_id_for_telegram_message(self, telegram_message_id: int) -> str | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT chat_id
+                FROM telegram_message_links
+                WHERE telegram_message_id = ?
+                """,
+                (telegram_message_id,),
+            ).fetchone()
+        return None if row is None else str(row[0])
+
+    def get_telegram_update_offset(self) -> int | None:
+        value = self.get_metadata("telegram_update_offset")
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
+    def set_telegram_update_offset(self, offset: int) -> None:
+        self.set_metadata("telegram_update_offset", str(offset))
+
     def get_or_create_device_id(self) -> str:
         existing = self.get_metadata("device_id")
         if existing:
@@ -72,6 +115,16 @@ class StateStore:
                 CREATE TABLE IF NOT EXISTS metadata (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS telegram_message_links (
+                    telegram_message_id INTEGER PRIMARY KEY,
+                    warframe_message_id TEXT NOT NULL,
+                    chat_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )

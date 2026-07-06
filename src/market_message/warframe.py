@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 import logging
+import secrets
 from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlparse
 
 from .config import Config
 from .models import ChatSummary, IncomingMessage
@@ -56,6 +59,44 @@ class WarframeMarketClient:
     def get_chat(self, chat_id: str) -> dict[str, Any]:
         return self._request("GET", f"/im/chats/{chat_id}")
 
+    def send_chat_message(self, chat_id: str, text: str) -> None:
+        try:
+            import websocket
+        except ImportError as exc:
+            raise WarframeMarketError(
+                "Sending Telegram replies requires the websocket-client package"
+            ) from exc
+
+        payload = {
+            "type": "@WS/chats/SEND_MESSAGE",
+            "payload": {
+                "chat_id": chat_id,
+                "message": text,
+                "temp_id": secrets.token_hex(12),
+            },
+        }
+        headers = [
+            f"Origin: {self.config.market_base_url}",
+            "User-Agent: market-message/0.1",
+        ]
+        cookie_header = self._cookie_header()
+        if cookie_header:
+            headers.append(f"Cookie: {cookie_header}")
+
+        try:
+            socket = websocket.create_connection(
+                _websocket_url(self.config.market_base_url, self.config.platform),
+                timeout=self.config.request_timeout_seconds,
+                header=headers,
+                subprotocols=["wfm"],
+            )
+            try:
+                socket.send(json.dumps(payload))
+            finally:
+                socket.close()
+        except Exception as exc:
+            raise WarframeMarketError("Warframe Market WebSocket send failed") from exc
+
     def _fetch_csrf_token(self) -> str:
         response = self._client.get(self.config.market_base_url)
         response.raise_for_status()
@@ -95,6 +136,12 @@ class WarframeMarketClient:
         if not isinstance(data, dict):
             raise WarframeMarketError("Warframe Market returned unexpected JSON shape")
         return data
+
+    def _cookie_header(self) -> str:
+        return "; ".join(
+            f"{cookie.name}={cookie.value}"
+            for cookie in self._client.cookies.jar
+        )
 
 
 def extract_chats(data: dict[str, Any]) -> list[ChatSummary]:
@@ -216,6 +263,13 @@ def _optional_str(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _websocket_url(market_base_url: str, platform: str) -> str:
+    parsed = urlparse(market_base_url)
+    host = parsed.hostname or "warframe.market"
+    scheme = "wss" if parsed.scheme != "http" else "ws"
+    return f"{scheme}://ws.{host}/socket?platform={platform}"
 
 
 class _CsrfParser(HTMLParser):
