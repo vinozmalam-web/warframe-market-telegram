@@ -122,3 +122,18 @@ def test_main_processes_telegram_replies_before_polling_warframe(monkeypatch, tm
 
     assert result == 0
     assert StoppingForwarder.instances[0].forward_replies_calls == 1
+
+
+def test_main_redacts_telegram_bot_token_from_http_logs(monkeypatch, tmp_path, caplog):
+    configure_main(monkeypatch, tmp_path, FakeTelegramClient)
+
+    with caplog.at_level(logging.INFO):
+        result = app.main()
+        logging.getLogger("httpx").info(
+            'HTTP Request: POST https://api.telegram.org/bot123:secret/sendMessage '
+            '"HTTP/1.1 401 Unauthorized"'
+        )
+
+    assert result == 0
+    assert "bot123:secret" not in caplog.text
+    assert "bot<redacted>/sendMessage" in caplog.text

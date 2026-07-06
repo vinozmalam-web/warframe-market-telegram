@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import sys
 import time
 
@@ -11,11 +12,39 @@ from .telegram import TelegramClient
 from .warframe import AuthenticationError, WarframeMarketClient
 
 
-def main() -> int:
+_TELEGRAM_BOT_TOKEN_IN_URL = re.compile(r"(/bot)[0-9]+:[^/\s\"']+")
+
+
+class _TelegramBotTokenRedactionFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        redacted = _redact_telegram_bot_tokens(message)
+        if redacted != message:
+            record.msg = redacted
+            record.args = ()
+        return True
+
+
+def _redact_telegram_bot_tokens(message: str) -> str:
+    return _TELEGRAM_BOT_TOKEN_IN_URL.sub(r"\1<redacted>", message)
+
+
+def _configure_logging() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers:
+        if not any(
+            isinstance(existing_filter, _TelegramBotTokenRedactionFilter)
+            for existing_filter in handler.filters
+        ):
+            handler.addFilter(_TelegramBotTokenRedactionFilter())
+
+
+def main() -> int:
+    _configure_logging()
     logger = logging.getLogger("market_message")
 
     try:
