@@ -69,12 +69,12 @@ def main() -> int:
         logger.info("Polling every %s seconds", config.poll_interval_seconds)
         while True:
             try:
-                reply_count = forwarder.forward_replies()
-                if reply_count:
-                    logger.info("Sent %s Telegram reply/replies to Warframe Market", reply_count)
                 sent_count = forwarder.poll_once()
                 if sent_count:
                     logger.info("Forwarded %s message(s) to Telegram", sent_count)
+                reply_count = forwarder.forward_replies()
+                if reply_count:
+                    logger.info("Sent %s Telegram reply/replies to Warframe Market", reply_count)
             except AuthenticationError:
                 logger.warning("Warframe Market session expired; logging in again")
                 _login_until_success(warframe, config.poll_interval_seconds, logger)

@@ -75,6 +75,26 @@ class StoppingForwarder:
         raise KeyboardInterrupt
 
 
+class PollThenRepliesStoppingForwarder:
+    instances = []
+
+    def __init__(self, warframe, telegram, state, market_base_url):
+        self.warframe = warframe
+        self.telegram = telegram
+        self.state = state
+        self.market_base_url = market_base_url
+        self.calls = []
+        self.__class__.instances.append(self)
+
+    def poll_once(self):
+        self.calls.append("poll_once")
+        return 0
+
+    def forward_replies(self):
+        self.calls.append("forward_replies")
+        raise KeyboardInterrupt
+
+
 def configure_main(monkeypatch, tmp_path, telegram_cls):
     config = SimpleNamespace(
         state_path=tmp_path / "state.sqlite",
@@ -115,13 +135,18 @@ def test_main_logs_and_continues_when_startup_notification_fails(
     assert "Telegram startup notification failed; continuing" in caplog.text
 
 
-def test_main_processes_telegram_replies_before_polling_warframe(monkeypatch, tmp_path):
+def test_main_polls_warframe_before_processing_telegram_replies(monkeypatch, tmp_path):
     configure_main(monkeypatch, tmp_path, FakeTelegramClient)
+    PollThenRepliesStoppingForwarder.instances = []
+    monkeypatch.setattr(app, "MessageForwarder", PollThenRepliesStoppingForwarder)
 
     result = app.main()
 
     assert result == 0
-    assert StoppingForwarder.instances[0].forward_replies_calls == 1
+    assert PollThenRepliesStoppingForwarder.instances[0].calls == [
+        "poll_once",
+        "forward_replies",
+    ]
 
 
 def test_main_redacts_telegram_bot_token_from_http_logs(monkeypatch, tmp_path, caplog):
