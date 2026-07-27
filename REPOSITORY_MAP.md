@@ -43,7 +43,7 @@
 - **`static/`**
   - `Назначение`: Фронтенд Telegram Mini App (HTML, CSS, JS, Service Worker).
   - `Точки входа`: `app/web/static/index.html`, `app/web/static/app.js`, `app/web/static/style.css`, `app/web/static/service-worker.js`
-  - `Контракты`: Поддержка тёмного интерфейса TMA, валидация формы, управление версией SW (`const SW_VERSION = "..."`).
+  - `Контракты`: Поддержка тёмного интерфейса TMA, валидация формы, кастомные дропдауны с текстовым поиском по названию оружия/характеристик (`SearchableSelect`), управление версией SW (`const SW_VERSION = "..."`).
 
 ### `ВАЖНОЕ ЗАМЕЧАНИЕ`
 при изменении фронтенда (app/web) необходимо инкрементировать версию в index.html 

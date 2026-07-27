@@ -201,6 +201,8 @@
         });
       weaponSelect.appendChild(optgroup);
     });
+
+    initSearchableSelect(weaponSelect);
   }
 
   function populateNegAttributeSelect() {
@@ -211,6 +213,8 @@
       opt.textContent = attr.effect;
       negStatSelect.appendChild(opt);
     });
+
+    initSearchableSelect(negStatSelect);
   }
 
   function refreshPosStatSelects() {
@@ -223,6 +227,8 @@
       });
       sel.innerHTML = optionsHtml;
       if (currentVal) sel.value = currentVal;
+
+      initSearchableSelect(sel);
     });
   }
 
@@ -378,6 +384,8 @@
     posStatsContainer.appendChild(div);
     currentPosStatCount++;
 
+    initSearchableSelect(div.querySelector('.pos-stat-select'));
+
     div.querySelector('.remove-stat-btn').addEventListener('click', () => {
       div.remove();
       currentPosStatCount--;
@@ -418,6 +426,9 @@
       specificNegGroup.style.display = 'none';
       addPosStatRow();
     }
+
+    initSearchableSelect(weaponSelect)?.updateSelectedLabel();
+    initSearchableSelect(negStatSelect)?.updateSelectedLabel();
 
     ruleModalOverlay.classList.add('active');
   }
@@ -529,6 +540,243 @@
   function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  class SearchableSelect {
+    constructor(selectElement) {
+      this.select = selectElement;
+      if (this.select._searchableSelect) {
+        this.select._searchableSelect.update();
+        return this.select._searchableSelect;
+      }
+      this.select._searchableSelect = this;
+      this.isOpen = false;
+      this.optionsData = [];
+      this.filteredData = [];
+
+      this.initUI();
+      this.bindEvents();
+      this.update();
+    }
+
+    initUI() {
+      this.select.style.display = 'none';
+
+      this.container = document.createElement('div');
+      this.container.className = 'custom-select-container';
+
+      this.trigger = document.createElement('button');
+      this.trigger.type = 'button';
+      this.trigger.className = 'custom-select-trigger';
+      this.trigger.innerHTML = `
+        <span class="custom-select-label"></span>
+        <span class="custom-select-arrow">▼</span>
+      `;
+
+      this.dropdown = document.createElement('div');
+      this.dropdown.className = 'custom-select-dropdown';
+
+      this.searchWrap = document.createElement('div');
+      this.searchWrap.className = 'custom-select-search-wrap';
+
+      this.searchInput = document.createElement('input');
+      this.searchInput.type = 'text';
+      this.searchInput.className = 'custom-select-search-input';
+      this.searchInput.placeholder = '🔍 Поиск...';
+      this.searchInput.setAttribute('autocomplete', 'off');
+
+      this.clearBtn = document.createElement('button');
+      this.clearBtn.type = 'button';
+      this.clearBtn.className = 'custom-select-clear-btn';
+      this.clearBtn.textContent = '✕';
+      this.clearBtn.style.display = 'none';
+
+      this.searchWrap.appendChild(this.searchInput);
+      this.searchWrap.appendChild(this.clearBtn);
+
+      this.optionsList = document.createElement('div');
+      this.optionsList.className = 'custom-select-options';
+
+      this.dropdown.appendChild(this.searchWrap);
+      this.dropdown.appendChild(this.optionsList);
+
+      this.container.appendChild(this.trigger);
+      this.container.appendChild(this.dropdown);
+
+      this.select.parentNode.insertBefore(this.container, this.select.nextSibling);
+    }
+
+    bindEvents() {
+      this.trigger.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggle();
+      });
+
+      this.searchInput.addEventListener('input', () => {
+        this.clearBtn.style.display = this.searchInput.value ? 'block' : 'none';
+        this.filter(this.searchInput.value);
+      });
+
+      this.searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          this.close();
+        }
+      });
+
+      this.clearBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.searchInput.value = '';
+        this.clearBtn.style.display = 'none';
+        this.filter('');
+        this.searchInput.focus();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (this.isOpen && !this.container.contains(e.target)) {
+          this.close();
+        }
+      });
+
+      this.select.addEventListener('change', () => {
+        this.updateSelectedLabel();
+      });
+    }
+
+    update() {
+      this.optionsData = [];
+      const children = Array.from(this.select.children);
+
+      children.forEach(child => {
+        if (child.tagName === 'OPTGROUP') {
+          const groupTitle = child.label;
+          Array.from(child.children).forEach(opt => {
+            if (opt.tagName === 'OPTION') {
+              this.optionsData.push({
+                value: opt.value,
+                text: opt.textContent,
+                group: groupTitle
+              });
+            }
+          });
+        } else if (child.tagName === 'OPTION') {
+          this.optionsData.push({
+            value: child.value,
+            text: child.textContent,
+            group: null
+          });
+        }
+      });
+
+      this.updateSelectedLabel();
+      if (this.isOpen) {
+        this.filter(this.searchInput.value);
+      }
+    }
+
+    updateSelectedLabel() {
+      const selectedOpt = this.optionsData.find(o => o.value === this.select.value) || this.optionsData[0];
+      const labelSpan = this.trigger.querySelector('.custom-select-label');
+      if (labelSpan) {
+        labelSpan.textContent = selectedOpt ? selectedOpt.text : 'Выберите...';
+      }
+    }
+
+    toggle() {
+      if (this.isOpen) {
+        this.close();
+      } else {
+        this.open();
+      }
+    }
+
+    open() {
+      document.querySelectorAll('.custom-select-container.is-open').forEach(c => {
+        if (c !== this.container && c._searchableSelect) {
+          c._searchableSelect.close();
+        }
+      });
+
+      this.isOpen = true;
+      this.container.classList.add('is-open');
+      this.searchInput.value = '';
+      this.clearBtn.style.display = 'none';
+      this.filter('');
+
+      setTimeout(() => {
+        this.searchInput.focus();
+      }, 50);
+    }
+
+    close() {
+      this.isOpen = false;
+      this.container.classList.remove('is-open');
+    }
+
+    filter(query) {
+      const q = query.trim().toLowerCase();
+      this.filteredData = this.optionsData.filter(item => {
+        if (!q) return true;
+        const textMatch = item.text.toLowerCase().includes(q);
+        const valMatch = item.value.toLowerCase().includes(q);
+        const groupMatch = item.group ? item.group.toLowerCase().includes(q) : false;
+        return textMatch || valMatch || groupMatch;
+      });
+
+      this.renderOptions();
+    }
+
+    renderOptions() {
+      this.optionsList.innerHTML = '';
+
+      if (this.filteredData.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'custom-select-empty';
+        emptyDiv.textContent = '🔍 Ничего не найдено';
+        this.optionsList.appendChild(emptyDiv);
+        return;
+      }
+
+      let lastGroup = undefined;
+      this.filteredData.forEach(item => {
+        if (item.group !== lastGroup) {
+          lastGroup = item.group;
+          if (item.group) {
+            const groupHeader = document.createElement('div');
+            groupHeader.className = 'custom-select-group-header';
+            groupHeader.textContent = item.group;
+            this.optionsList.appendChild(groupHeader);
+          }
+        }
+
+        const optionEl = document.createElement('div');
+        const isSelected = item.value === this.select.value;
+        optionEl.className = `custom-select-option ${isSelected ? 'selected' : ''}`;
+        optionEl.textContent = item.text;
+        optionEl.dataset.value = item.value;
+
+        optionEl.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.selectValue(item.value);
+        });
+
+        this.optionsList.appendChild(optionEl);
+      });
+    }
+
+    selectValue(val) {
+      this.select.value = val;
+      this.select.dispatchEvent(new Event('change', { bubbles: true }));
+      this.updateSelectedLabel();
+      this.close();
+    }
+  }
+
+  function initSearchableSelect(selectEl) {
+    if (!selectEl) return null;
+    return new SearchableSelect(selectEl);
   }
 
 })();

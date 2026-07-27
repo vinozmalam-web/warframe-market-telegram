@@ -1,4 +1,4 @@
-const SW_VERSION = "edcsod-pwa-v5";
+const SW_VERSION = "edcsod-pwa-v6";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
