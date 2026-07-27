@@ -19,6 +19,61 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
+FALLBACK_RIVEN_ATTRIBUTES: list[RivenAttribute] = [
+    RivenAttribute(url_name="critical_chance", effect="Critical Chance", positive_is_negative=False),
+    RivenAttribute(url_name="critical_damage", effect="Critical Damage", positive_is_negative=False),
+    RivenAttribute(url_name="base_damage_/_melee_damage", effect="Damage", positive_is_negative=False),
+    RivenAttribute(url_name="multishot", effect="Multishot", positive_is_negative=False),
+    RivenAttribute(url_name="fire_rate_/_attack_speed", effect="Fire Rate / Attack Speed", positive_is_negative=False),
+    RivenAttribute(url_name="toxin_damage", effect="Toxin", positive_is_negative=False),
+    RivenAttribute(url_name="heat_damage", effect="Heat", positive_is_negative=False),
+    RivenAttribute(url_name="cold_damage", effect="Cold", positive_is_negative=False),
+    RivenAttribute(url_name="electric_damage", effect="Electricity", positive_is_negative=False),
+    RivenAttribute(url_name="status_chance", effect="Status Chance", positive_is_negative=False),
+    RivenAttribute(url_name="status_duration", effect="Status Duration", positive_is_negative=False),
+    RivenAttribute(url_name="slash_damage", effect="Slash", positive_is_negative=False),
+    RivenAttribute(url_name="puncture_damage", effect="Puncture", positive_is_negative=False),
+    RivenAttribute(url_name="impact_damage", effect="Impact", positive_is_negative=False),
+    RivenAttribute(url_name="punch_through", effect="Punch Through", positive_is_negative=False),
+    RivenAttribute(url_name="reload_speed", effect="Reload Speed", positive_is_negative=False),
+    RivenAttribute(url_name="magazine_capacity", effect="Magazine Capacity", positive_is_negative=False),
+    RivenAttribute(url_name="ammo_maximum", effect="Ammo Maximum", positive_is_negative=False),
+    RivenAttribute(url_name="projectile_speed", effect="Projectile Speed", positive_is_negative=False),
+    RivenAttribute(url_name="recoil", effect="Weapon Recoil", positive_is_negative=True),
+    RivenAttribute(url_name="range", effect="Range", positive_is_negative=False),
+    RivenAttribute(url_name="channeling_damage", effect="Initial Combo", positive_is_negative=False),
+    RivenAttribute(url_name="combo_duration", effect="Combo Duration", positive_is_negative=False),
+    RivenAttribute(url_name="chance_to_gain_extra_combo_count", effect="Additional Combo Count Chance", positive_is_negative=False),
+    RivenAttribute(url_name="chance_to_gain_combo_count", effect="Chance to Gain Combo Count", positive_is_negative=False),
+    RivenAttribute(url_name="finisher_damage", effect="Finisher Damage", positive_is_negative=False),
+    RivenAttribute(url_name="channeling_efficiency", effect="Heavy Attack Efficiency", positive_is_negative=False),
+    RivenAttribute(url_name="damage_vs_grineer", effect="Damage to Grineer", positive_is_negative=False),
+    RivenAttribute(url_name="damage_vs_corpus", effect="Damage to Corpus", positive_is_negative=False),
+    RivenAttribute(url_name="damage_vs_infested", effect="Damage to Infested", positive_is_negative=False),
+    RivenAttribute(url_name="zoom", effect="Zoom", positive_is_negative=True),
+    RivenAttribute(url_name="critical_chance_on_slide_attack", effect="Critical Chance for Slide Attack", positive_is_negative=False),
+]
+
+FALLBACK_RIVEN_ITEMS: list[RivenItem] = [
+    RivenItem(url_name="rubico", item_name="Rubico", group="primary", riven_type="sniper"),
+    RivenItem(url_name="torid", item_name="Torid", group="primary", riven_type="rifle"),
+    RivenItem(url_name="glaive", item_name="Glaive", group="melee", riven_type="melee"),
+    RivenItem(url_name="burston", item_name="Burston", group="primary", riven_type="rifle"),
+    RivenItem(url_name="latron", item_name="Latron", group="primary", riven_type="rifle"),
+    RivenItem(url_name="lex", item_name="Lex", group="secondary", riven_type="pistol"),
+    RivenItem(url_name="strun", item_name="Strun", group="primary", riven_type="shotgun"),
+    RivenItem(url_name="nataruk", item_name="Nataruk", group="primary", riven_type="bow"),
+    RivenItem(url_name="stropha", item_name="Stropha", group="melee", riven_type="melee"),
+    RivenItem(url_name="kronen", item_name="Kronen", group="melee", riven_type="melee"),
+    RivenItem(url_name="kuva_bramma", item_name="Kuva Bramma", group="primary", riven_type="bow"),
+    RivenItem(url_name="kuva_zarr", item_name="Kuva Zarr", group="primary", riven_type="shotgun"),
+    RivenItem(url_name="felarx", item_name="Felarx", group="primary", riven_type="shotgun"),
+    RivenItem(url_name="phenmor", item_name="Phenmor", group="primary", riven_type="rifle"),
+    RivenItem(url_name="laetum", item_name="Laetum", group="secondary", riven_type="pistol"),
+    RivenItem(url_name="cerata", item_name="Cerata", group="melee", riven_type="melee"),
+    RivenItem(url_name="nikana", item_name="Nikana", group="melee", riven_type="melee"),
+]
+
 
 class WarframeMarketError(RuntimeError):
     """Base error for Warframe Market API failures."""
@@ -67,12 +122,44 @@ class WarframeMarketClient:
         return self._request("GET", f"/im/chats/{chat_id}")
 
     def get_riven_items(self) -> list[RivenItem]:
-        data = self._request("GET", "/riven/items")
-        return extract_riven_items(data)
+        try:
+            data = self._request("GET", "/v2/riven/weapons")
+            items = extract_riven_items(data)
+            if items:
+                return items
+        except Exception as exc:
+            logger.warning("Failed to fetch riven weapons from v2 API: %s", exc)
+
+        try:
+            data = self._request("GET", "/riven/items")
+            items = extract_riven_items(data)
+            if items:
+                return items
+        except Exception as exc:
+            logger.warning("Failed to fetch riven items from v1 API: %s", exc)
+
+        logger.info("Using fallback static riven items list")
+        return FALLBACK_RIVEN_ITEMS
 
     def get_riven_attributes(self) -> list[RivenAttribute]:
-        data = self._request("GET", "/riven/attributes")
-        return extract_riven_attributes(data)
+        try:
+            data = self._request("GET", "/v2/riven/attributes")
+            attrs = extract_riven_attributes(data)
+            if attrs:
+                return attrs
+        except Exception as exc:
+            logger.warning("Failed to fetch riven attributes from v2 API: %s", exc)
+
+        try:
+            data = self._request("GET", "/riven/attributes")
+            attrs = extract_riven_attributes(data)
+            if attrs:
+                return attrs
+        except Exception as exc:
+            logger.warning("Failed to fetch riven attributes from v1 API: %s", exc)
+
+        logger.info("Using fallback static riven attributes list")
+        return FALLBACK_RIVEN_ATTRIBUTES
 
     def search_auctions(self, type_: str = "riven", weapon_url_name: str | None = None) -> list[AuctionItem]:
         path = f"/auctions/search?type={type_}"
@@ -143,7 +230,13 @@ class WarframeMarketClient:
         if csrf and self._csrf_token:
             headers["X-CSRFToken"] = self._csrf_token
 
-        url = f"{self.config.api_base_url}{path}"
+        if path.startswith("/v2/"):
+            base_url = self.config.api_base_url
+            if "/v1" in base_url:
+                base_url = base_url.split("/v1")[0]
+            url = f"{base_url}{path}"
+        else:
+            url = f"{self.config.api_base_url}{path}"
         response = self._client.request(method, url, headers=headers, **kwargs)
         if response.status_code in {401, 403}:
             raise AuthenticationError(f"Warframe Market returned {response.status_code}")
@@ -307,24 +400,59 @@ class _CsrfParser(HTMLParser):
             self.csrf_token = attr_map["content"]
 
 
+def _extract_i18n_name(i18n_data: Any, preferred_lang: str = "ru") -> str | None:
+    if not isinstance(i18n_data, dict):
+        return None
+    for lang in (preferred_lang, "en"):
+        entry = i18n_data.get(lang)
+        if isinstance(entry, dict) and entry.get("name"):
+            return str(entry["name"])
+    for entry in i18n_data.values():
+        if isinstance(entry, dict) and entry.get("name"):
+            return str(entry["name"])
+    return None
+
+
+def _extract_i18n_icon(i18n_data: Any) -> str | None:
+    if not isinstance(i18n_data, dict):
+        return None
+    for lang in ("en", "ru"):
+        entry = i18n_data.get(lang)
+        if isinstance(entry, dict) and entry.get("icon"):
+            return str(entry["icon"])
+    return None
+
+
 def extract_riven_items(data: dict[str, Any]) -> list[RivenItem]:
     payload = _unwrap_payload(data)
     items_raw = _extract_collection(payload, "items")
+    if not items_raw and isinstance(data, dict):
+        raw_data = data.get("data")
+        if isinstance(raw_data, list):
+            items_raw = raw_data
+
     result: list[RivenItem] = []
     for item in items_raw:
         if not isinstance(item, dict):
             continue
-        url_name = item.get("url_name")
-        item_name = item.get("item_name") or item.get("name")
+        url_name = item.get("url_name") or item.get("slug")
+        item_name = (
+            item.get("item_name")
+            or item.get("name")
+            or _extract_i18n_name(item.get("i18n"))
+            or url_name
+        )
         if not url_name or not item_name:
             continue
+        riven_type = _optional_str(item.get("riven_type") or item.get("rivenType"))
+        icon = _optional_str(item.get("icon") or _extract_i18n_icon(item.get("i18n")))
         result.append(
             RivenItem(
                 url_name=str(url_name),
                 item_name=str(item_name),
                 group=str(item.get("group", "primary")),
-                riven_type=_optional_str(item.get("riven_type")),
-                icon=_optional_str(item.get("icon")),
+                riven_type=riven_type,
+                icon=icon,
             )
         )
     return result
@@ -333,12 +461,22 @@ def extract_riven_items(data: dict[str, Any]) -> list[RivenItem]:
 def extract_riven_attributes(data: dict[str, Any]) -> list[RivenAttribute]:
     payload = _unwrap_payload(data)
     attrs_raw = _extract_collection(payload, "attributes")
+    if not attrs_raw and isinstance(data, dict):
+        raw_data = data.get("data")
+        if isinstance(raw_data, list):
+            attrs_raw = raw_data
+
     result: list[RivenAttribute] = []
     for attr in attrs_raw:
         if not isinstance(attr, dict):
             continue
-        url_name = attr.get("url_name")
-        effect = attr.get("effect")
+        url_name = attr.get("url_name") or attr.get("slug")
+        effect = (
+            attr.get("effect")
+            or attr.get("name")
+            or _extract_i18n_name(attr.get("i18n"))
+            or url_name
+        )
         if not url_name or not effect:
             continue
         result.append(

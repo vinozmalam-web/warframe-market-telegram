@@ -18,9 +18,9 @@
   - `Точки входа`: `StateStore`
   - `Контракты`: Инициализация таблиц, дедупликация сообщений/аукционов, CRUD правил снайпинга.
 - **`warframe.py`**
-  - `Назначение`: Клиент для работы с REST API и WebSocket Warframe Market (аутентификация, чаты, аукционы, справочники Riven).
-  - `Точки входа`: `WarframeMarketClient`
-  - `Контракты`: Использование токенов сессий, обработка ошибок авторизации и Cloudflare rate limits.
+  - `Назначение`: Клиент для работы с REST API и WebSocket Warframe Market (аутентификация, чаты, аукционы, справочники Riven v1/v2 и фолбэк-списки).
+  - `Точки входа`: `WarframeMarketClient`, `extract_riven_items`, `extract_riven_attributes`, `FALLBACK_RIVEN_ITEMS`, `FALLBACK_RIVEN_ATTRIBUTES`
+  - `Контракты`: Использование токенов сессий, поддержка v2 API (`/v2/riven/weapons`, `/v2/riven/attributes`), статическая страховка при сбоях API, обработка ошибок авторизации и Cloudflare rate limits.
 - **`telegram.py`**
   - `Назначение`: Клиент Telegram Bot API для отправки уведомлений, обработки reply и вызова Telegram Mini App.
   - `Точки входа`: `TelegramClient`

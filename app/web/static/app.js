@@ -77,6 +77,7 @@
 
       populateWeaponSelect();
       populateNegAttributeSelect();
+      refreshPosStatSelects();
     } catch (err) {
       console.error('Failed to load metadata:', err);
     }
@@ -84,11 +85,41 @@
 
   function populateWeaponSelect() {
     weaponSelect.innerHTML = '<option value="*">✨ Любое оружие (Any Weapon)</option>';
-    weapons.sort((a, b) => a.item_name.localeCompare(b.item_name)).forEach(w => {
-      const opt = document.createElement('option');
-      opt.value = w.url_name;
-      opt.textContent = `${w.item_name} (${w.group})`;
-      weaponSelect.appendChild(opt);
+
+    const groups = {};
+    weapons.forEach(w => {
+      const g = (w.group || 'primary').toLowerCase();
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(w);
+    });
+
+    const groupTitles = {
+      primary: '🔫 Основное оружие (Primary)',
+      secondary: '🔫 Вторичное оружие (Secondary)',
+      melee: '⚔️ Ближний бой (Melee)',
+      archgun: '🚀 Арчган (Archgun)',
+      other: '✨ Другое (Other)',
+    };
+
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      const order = ['primary', 'secondary', 'melee', 'archgun', 'other'];
+      const ia = order.indexOf(a) >= 0 ? order.indexOf(a) : 99;
+      const ib = order.indexOf(b) >= 0 ? order.indexOf(b) : 99;
+      return ia - ib;
+    });
+
+    sortedKeys.forEach(gKey => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = groupTitles[gKey] || gKey.toUpperCase();
+      groups[gKey]
+        .sort((a, b) => a.item_name.localeCompare(b.item_name))
+        .forEach(w => {
+          const opt = document.createElement('option');
+          opt.value = w.url_name;
+          opt.textContent = w.item_name;
+          optgroup.appendChild(opt);
+        });
+      weaponSelect.appendChild(optgroup);
     });
   }
 
@@ -99,6 +130,19 @@
       opt.value = attr.url_name;
       opt.textContent = attr.effect;
       negStatSelect.appendChild(opt);
+    });
+  }
+
+  function refreshPosStatSelects() {
+    posStatsContainer.querySelectorAll('.pos-stat-select').forEach(sel => {
+      const currentVal = sel.value;
+      let optionsHtml = '';
+      attributes.sort((a, b) => a.effect.localeCompare(b.effect)).forEach(attr => {
+        const selected = attr.url_name === currentVal ? 'selected' : '';
+        optionsHtml += `<option value="${attr.url_name}" ${selected}>${attr.effect}</option>`;
+      });
+      sel.innerHTML = optionsHtml;
+      if (currentVal) sel.value = currentVal;
     });
   }
 

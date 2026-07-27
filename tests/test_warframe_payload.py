@@ -98,3 +98,66 @@ def test_send_chat_message_uses_warframe_websocket(monkeypatch):
     assert calls["payload"]["payload"]["message"] == "reply text"
     assert len(calls["payload"]["payload"]["temp_id"]) == 24
     assert calls["closed"] is True
+
+
+def test_extract_riven_items_and_attributes_v2():
+    from market_message.warframe import extract_riven_items, extract_riven_attributes
+
+    v2_weapons_payload = {
+        "apiVersion": "0.25.0",
+        "data": [
+            {
+                "id": "123",
+                "slug": "kulstar",
+                "group": "secondary",
+                "rivenType": "pistol",
+                "i18n": {"ru": {"name": "Кулстар"}, "en": {"name": "Kulstar"}},
+            }
+        ],
+    }
+
+    weapons = extract_riven_items(v2_weapons_payload)
+    assert len(weapons) == 1
+    assert weapons[0].url_name == "kulstar"
+    assert weapons[0].item_name == "Кулстар"
+    assert weapons[0].group == "secondary"
+    assert weapons[0].riven_type == "pistol"
+
+    v2_attrs_payload = {
+        "apiVersion": "0.25.0",
+        "data": [
+            {
+                "id": "456",
+                "slug": "punch_through",
+                "group": "default",
+                "i18n": {"ru": {"name": "Пронзание Навылет"}, "en": {"name": "Punch Through"}},
+            }
+        ],
+    }
+
+    attrs = extract_riven_attributes(v2_attrs_payload)
+    assert len(attrs) == 1
+    assert attrs[0].url_name == "punch_through"
+    assert attrs[0].effect == "Пронзание Навылет"
+
+
+def test_get_riven_meta_fallback(monkeypatch):
+    config = Config(
+        warframe_email="seller@example.com",
+        warframe_password="secret",
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+
+    # Force HTTP request to fail so it uses static fallback
+    monkeypatch.setattr(client, "_request", lambda method, path, **kwargs: Exception("Network error"))
+
+    weapons = client.get_riven_items()
+    assert len(weapons) > 0
+    assert any(w.url_name == "rubico" for w in weapons)
+
+    attrs = client.get_riven_attributes()
+    assert len(attrs) == 32
+    assert any(a.url_name == "critical_chance" for a in attrs)
+
