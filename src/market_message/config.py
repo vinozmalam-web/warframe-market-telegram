@@ -32,6 +32,7 @@ class Config:
     max_alerts_per_rule_run: int = 3
     seen_auction_ttl_days: int = 7
     warframe_max_requests_per_second: float = 3.0
+    warframe_max_requests_per_minute: float = 10.0
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Config":
@@ -87,6 +88,10 @@ class Config:
         if warframe_max_requests_per_second <= 0:
             raise ConfigError("WARFRAME_MARKET_MAX_RPS must be greater than 0")
 
+        warframe_max_requests_per_minute = _float_env(values, "WARFRAME_MARKET_MAX_RPM", 10.0)
+        if warframe_max_requests_per_minute <= 0:
+            raise ConfigError("WARFRAME_MARKET_MAX_RPM must be greater than 0")
+
         return cls(
             warframe_email=warframe_email or "",
             warframe_password=warframe_password or "",
@@ -108,6 +113,7 @@ class Config:
             max_alerts_per_rule_run=max_alerts_per_rule_run,
             seen_auction_ttl_days=seen_auction_ttl_days,
             warframe_max_requests_per_second=warframe_max_requests_per_second,
+            warframe_max_requests_per_minute=warframe_max_requests_per_minute,
         )
 
 

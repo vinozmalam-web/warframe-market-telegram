@@ -92,9 +92,10 @@ class WarframeMarketClient:
         self.current_user_id: str | None = None
         self._csrf_token: str | None = None
         self._rate_limit_lock = threading.Lock()
-        self._last_request_time: float = 0.0
-        max_rps = getattr(config, "warframe_max_requests_per_second", 3.0)
-        self._min_request_interval: float = 1.0 / max_rps if max_rps > 0 else 0.0
+        self._request_timestamps: list[float] = []
+        self._max_rps = getattr(config, "warframe_max_requests_per_second", 3.0)
+        self._max_rpm = getattr(config, "warframe_max_requests_per_minute", 10.0)
+        self._min_request_interval: float = 1.0 / self._max_rps if self._max_rps > 0 else 0.0
         import httpx
 
         self._client = httpx.Client(
@@ -228,14 +229,33 @@ class WarframeMarketClient:
             raise WarframeMarketError("Warframe Market WebSocket send failed") from exc
 
     def _rate_limit(self) -> None:
-        if self._min_request_interval <= 0:
+        if self._max_rps <= 0 and self._max_rpm <= 0:
             return
         with self._rate_limit_lock:
-            now = time.monotonic()
-            elapsed = now - self._last_request_time
-            if elapsed < self._min_request_interval:
-                time.sleep(self._min_request_interval - elapsed)
-            self._last_request_time = time.monotonic()
+            while True:
+                now = time.monotonic()
+                self._request_timestamps = [t for t in self._request_timestamps if now - t < 60.0]
+
+                wait_time = 0.0
+
+                if self._max_rpm > 0 and len(self._request_timestamps) >= self._max_rpm:
+                    oldest_in_minute = self._request_timestamps[len(self._request_timestamps) - int(self._max_rpm)]
+                    wait_time = max(wait_time, 60.0 - (now - oldest_in_minute))
+
+                recent_1s = [t for t in self._request_timestamps if now - t < 1.0]
+                if self._max_rps > 0 and len(recent_1s) >= self._max_rps:
+                    oldest_in_second = recent_1s[len(recent_1s) - int(self._max_rps)]
+                    wait_time = max(wait_time, 1.0 - (now - oldest_in_second))
+                elif self._min_request_interval > 0 and self._request_timestamps:
+                    elapsed = now - self._request_timestamps[-1]
+                    if elapsed < self._min_request_interval:
+                        wait_time = max(wait_time, self._min_request_interval - elapsed)
+
+                if wait_time > 0.0001:
+                    time.sleep(wait_time)
+                else:
+                    self._request_timestamps.append(time.monotonic())
+                    break
 
     def _send_request(self, method: str, url: str, headers: dict[str, str] | None = None, **kwargs: Any) -> Any:
         max_retries = 3

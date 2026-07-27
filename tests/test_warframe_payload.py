@@ -226,3 +226,45 @@ def test_warframe_client_429_retry(monkeypatch):
     client.close()
 
 
+def test_warframe_client_rpm_rate_limiting(monkeypatch):
+    import time
+    fake_time = 1000.0
+    slept = []
+
+    def fake_monotonic():
+        nonlocal fake_time
+        return fake_time
+
+    def fake_sleep(secs):
+        nonlocal fake_time
+        slept.append(secs)
+        fake_time += secs
+
+    monkeypatch.setattr(time, "monotonic", fake_monotonic)
+    monkeypatch.setattr(time, "sleep", fake_sleep)
+
+    config = Config(
+        warframe_email="seller@example.com",
+        warframe_password="secret",
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+        warframe_max_requests_per_second=1000.0,
+        warframe_max_requests_per_minute=2.0,
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+
+    class DummyResponse:
+        status_code = 200
+        def json(self):
+            return {"payload": {}}
+
+    monkeypatch.setattr(client._client, "request", lambda method, url, **kwargs: DummyResponse())
+
+    # Send 3 requests when RPM limit is 2 per minute
+    for _ in range(3):
+        client.list_chats()
+
+    client.close()
+    assert any(s > 50.0 for s in slept)  # Should sleep ~60 seconds to satisfy 2 RPM limit
+
+
