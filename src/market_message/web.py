@@ -51,7 +51,11 @@ class WebServer:
     async def handle_index(self, request: web.Request) -> web.StreamResponse:
         index_path = self.static_dir / "index.html"
         if index_path.exists():
-            return web.FileResponse(index_path)
+            response = web.FileResponse(index_path)
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+            return response
         return web.Response(text="index.html not found", status=404)
 
     def _validate_request_auth(self, request: web.Request, body_json: dict | None = None) -> bool:
