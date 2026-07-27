@@ -29,8 +29,8 @@
   - `Точки входа`: `RivenSniperEngine`
 - **`web.py`**
   - `Назначение`: HTTP-сервер для обработки запросов Telegram Mini App и отдачи статики.
-  - `Точки входа`: `run_web_server()`
-  - `Контракты`: Проверка `initData` Telegram на безопасность в state-changing эндпоинтах.
+  - `Точки входа`: `run_web_server()`, `WebServer.handle_index`
+  - `Контракты`: Проверка `initData` Telegram на безопасность в state-changing эндпоинтах, отдача `index.html` по умолчанию для `/` (без листинга файлов директории).
 - **`forwarder.py`**
   - `Назначение`: Связующая логика между Warframe Market и Telegram для пересылки входящих сообщений.
   - `Точки входа`: `MessageForwarder`

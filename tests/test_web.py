@@ -95,3 +95,46 @@ async def test_web_server_rules_crud(tmp_path):
         assert len(rules) == 0
     finally:
         await client.close()
+
+
+@pytest.mark.anyio
+async def test_web_server_serves_index(tmp_path):
+    (tmp_path / "index.html").write_text("<!DOCTYPE html><html><body>Test SPA</body></html>")
+    (tmp_path / "app.js").write_text("console.log('test');")
+
+    config = Config(
+        warframe_email="test@example.com",
+        warframe_password="pass",
+        telegram_bot_token="123456:ABC-DEF",
+        telegram_chat_id="123",
+        state_path=tmp_path / "state.sqlite",
+    )
+    state = StateStore(config.state_path)
+
+    class DummyWarframe:
+        pass
+
+    web_server = WebServer(config, state, DummyWarframe(), static_dir=tmp_path)
+    server = TestServer(web_server.app)
+    client = TestClient(server)
+    await client.start_server()
+
+    try:
+        # GET / should return index.html
+        resp = await client.get("/")
+        assert resp.status == 200
+        text = await resp.text()
+        assert "Test SPA" in text
+
+        # GET /index.html should return index.html
+        resp_idx = await client.get("/index.html")
+        assert resp_idx.status == 200
+        assert "Test SPA" in await resp_idx.text()
+
+        # GET /app.js should return app.js static file
+        resp_js = await client.get("/app.js")
+        assert resp_js.status == 200
+        assert "console.log" in await resp_js.text()
+    finally:
+        await client.close()
+

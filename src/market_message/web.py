@@ -35,6 +35,8 @@ class WebServer:
         self._setup_routes()
 
     def _setup_routes(self) -> None:
+        self.app.router.add_get("/", self.handle_index)
+        self.app.router.add_get("/index.html", self.handle_index)
         self.app.router.add_get("/api/riven/meta", self.handle_riven_meta)
         self.app.router.add_get("/api/rules", self.handle_get_rules)
         self.app.router.add_post("/api/rules", self.handle_create_rule)
@@ -43,7 +45,13 @@ class WebServer:
 
         # Serve static files for Telegram Mini App
         if self.static_dir.exists():
-            self.app.router.add_static("/", self.static_dir, show_index=True)
+            self.app.router.add_static("/", self.static_dir, show_index=False)
+
+    async def handle_index(self, request: web.Request) -> web.StreamResponse:
+        index_path = self.static_dir / "index.html"
+        if index_path.exists():
+            return web.FileResponse(index_path)
+        return web.Response(text="index.html not found", status=404)
 
     def _validate_request_init_data(self, request: web.Request, body_json: dict | None = None) -> bool:
         # Check header
