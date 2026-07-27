@@ -102,15 +102,16 @@
    cp .env.example .env
    nano .env
    ```
-2. Укажите ваши реальные боевые данные:
+2. Укажите ваши боевые данные и токен туннеля Cloudflare:
    ```env
    WARFRAME_MARKET_EMAIL=seller@example.com
    WARFRAME_MARKET_PASSWORD=strong_password
    TELEGRAM_BOT_TOKEN=123456789:AA...
    TELEGRAM_CHAT_ID=123456789
    WEB_APP_URL=https://wf-sniper.yourdomain.com
+   TUNNEL_TOKEN=eyJh...
    ```
-3. Запустите контейнер в фоновом режиме:
+3. Запустите контейнеры в фоновом режиме:
    ```bash
    docker compose up -d --build
    ```

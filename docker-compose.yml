@@ -30,7 +30,9 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
     restart: unless-stopped
-    command: ${CLOUDFLARE_TUNNEL_COMMAND:-tunnel --no-autoupdate run --url http://market-message:8080}
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    command: ${CLOUDFLARE_TUNNEL_COMMAND:-tunnel --no-autoupdate run}
 
 volumes:
   market-message-data:
