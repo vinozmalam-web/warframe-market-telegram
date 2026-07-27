@@ -164,7 +164,7 @@
   }
 
   function populateWeaponSelect() {
-    weaponSelect.innerHTML = '<option value="*">✨ Любое оружие (Any Weapon)</option>';
+    weaponSelect.innerHTML = '<option value="" disabled selected>-- Выберите конкретное оружие --</option>';
 
     const groups = {};
     weapons.forEach(w => {
@@ -269,7 +269,7 @@
       const card = document.createElement('div');
       card.className = `rule-card ${rule.is_active ? '' : 'inactive'}`;
 
-      const weaponName = rule.weapon_url_name === '*' ? 'Любое оружие' : (
+      const weaponName = (rule.weapon_url_name === '*' || !rule.weapon_url_name) ? '⚠️ Оружие не выбрано (Запрещено)' : (
         weapons.find(w => w.url_name === rule.weapon_url_name)?.item_name || rule.weapon_url_name
       );
 
@@ -401,7 +401,7 @@
       modalTitleText.textContent = 'Редактировать правило';
       ruleIdInput.value = rule.id;
       ruleNameInput.value = rule.name;
-      weaponSelect.value = rule.weapon_url_name || '*';
+      weaponSelect.value = rule.weapon_url_name || '';
       minPriceInput.value = rule.min_price ?? '';
       maxPriceInput.value = rule.max_price ?? '';
       minRerollsInput.value = rule.min_rerolls ?? '';
@@ -420,7 +420,7 @@
     } else {
       modalTitleText.textContent = 'Создать новое правило';
       ruleIdInput.value = '';
-      weaponSelect.value = '*';
+      weaponSelect.value = '';
       sellerStatusSelect.value = 'ingame';
       negModeSelect.value = 'any_or_none';
       specificNegGroup.style.display = 'none';
@@ -439,6 +439,11 @@
 
   async function handleFormSubmit(e) {
     e.preventDefault();
+
+    if (!weaponSelect.value || weaponSelect.value === '*') {
+      showToast('Пожалуйста, выберите конкретное оружие');
+      return;
+    }
 
     const positive_stats = [];
     posStatsContainer.querySelectorAll('.stat-row').forEach(row => {

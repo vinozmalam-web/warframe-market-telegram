@@ -181,6 +181,13 @@ class WebServer:
         if not isinstance(body, dict):
             return web.json_response({"error": "Invalid JSON body"}, status=400)
 
+        w_name = body.get("weapon_url_name")
+        if not w_name or w_name == "*":
+            return web.json_response(
+                {"error": "Поиск по 'Любое оружие' запрещен. Пожалуйста, выберите конкретное оружие."},
+                status=400,
+            )
+
         try:
             rule_obj = SniperRule.from_dict(body)
             saved_rule = self.state.create_sniper_rule(rule_obj)
@@ -207,6 +214,13 @@ class WebServer:
 
         if not isinstance(body, dict):
             return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        w_name = body.get("weapon_url_name")
+        if not w_name or w_name == "*":
+            return web.json_response(
+                {"error": "Поиск по 'Любое оружие' запрещен. Пожалуйста, выберите конкретное оружие."},
+                status=400,
+            )
 
         existing = self.state.get_sniper_rule(rule_id)
         if not existing:

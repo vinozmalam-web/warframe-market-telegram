@@ -393,7 +393,7 @@ def test_sniper_price_drop_retrigger(tmp_path):
     assert state.get_seen_auction_price("auc_pd_1") == 450
 
 
-def test_sniper_wildcard_weapon_with_positive_stats(tmp_path):
+def test_sniper_wildcard_weapon_disabled(tmp_path):
     from market_message.sniper import RivenSniperEngine
     from market_message.state import StateStore
 
@@ -405,28 +405,14 @@ def test_sniper_wildcard_weapon_with_positive_stats(tmp_path):
 
     class FakeWarframe:
         def search_auctions(self, type_="riven", weapon_url_name=None, positive_stats=None, sort_by=None):
-            calls.append({"weapon_url_name": weapon_url_name, "positive_stats": positive_stats})
-            return [
-                AuctionItem(
-                    id="auc_wild_1",
-                    weapon_url_name="rubico",
-                    riven_name="rubico croni-crit",
-                    attributes=[AuctionAttribute("critical_chance", positive=True, value=150.0)],
-                    buyout_price=500,
-                    starting_price=500,
-                    rerolls=0,
-                    mastery_rank=12,
-                    polarity="madurai",
-                    seller_name="Tenno",
-                    seller_status="ingame",
-                )
-            ]
+            calls.append(weapon_url_name)
+            return []
 
     state = StateStore(tmp_path / "test_state.sqlite")
     rule = SniperRule(
-        name="Any Weapon CC",
+        name="Wildcard Rule",
         weapon_url_name="*",
-        positive_stats=[{"url_name": "critical_chance", "min_value": 100.0}],
+        max_price=500,
         is_active=True,
     )
     state.create_sniper_rule(rule)
@@ -439,67 +425,10 @@ def test_sniper_wildcard_weapon_with_positive_stats(tmp_path):
     )
 
     notified = engine.check_auctions_once()
-    assert notified == 1
-    assert len(calls) == 1
-    assert calls[0]["weapon_url_name"] is None or calls[0]["weapon_url_name"] == "*"
-    assert calls[0]["positive_stats"] == ["critical_chance"] or calls[0]["positive_stats"] == "critical_chance"
+    # Wildcard search is disabled, so zero alerts and zero API calls should occur
+    assert notified == 0
+    assert len(calls) == 0
 
-
-def test_sniper_wildcard_weapon_without_positive_stats(tmp_path):
-    from market_message.models import RivenItem
-    from market_message.sniper import RivenSniperEngine
-    from market_message.state import StateStore
-
-    search_calls = []
-
-    class FakeTelegram:
-        def send_message(self, text, parse_mode=None, reply_markup=None):
-            return True
-
-    class FakeWarframe:
-        def get_riven_items(self):
-            return [
-                RivenItem(url_name="rubico", item_name="Rubico", group="primary"),
-                RivenItem(url_name="glaive", item_name="Glaive", group="melee"),
-            ]
-
-        def search_auctions(self, type_="riven", weapon_url_name=None, positive_stats=None, sort_by=None):
-            search_calls.append(weapon_url_name)
-            return [
-                AuctionItem(
-                    id=f"auc_{weapon_url_name}",
-                    weapon_url_name=weapon_url_name,
-                    riven_name=f"{weapon_url_name} mod",
-                    attributes=[],
-                    buyout_price=100,
-                    starting_price=100,
-                    rerolls=0,
-                    mastery_rank=10,
-                    polarity="madurai",
-                    seller_name="Seller",
-                    seller_status="ingame",
-                )
-            ]
-
-    state = StateStore(tmp_path / "test_state.sqlite")
-    rule = SniperRule(
-        name="Any Weapon Cheap",
-        weapon_url_name="*",
-        max_price=200,
-        is_active=True,
-    )
-    state.create_sniper_rule(rule)
-
-    engine = RivenSniperEngine(
-        warframe=FakeWarframe(),
-        telegram=FakeTelegram(),
-        state=state,
-        market_base_url="https://warframe.market",
-    )
-
-    notified = engine.check_auctions_once()
-    assert notified == 2
-    assert search_calls == ["rubico", "glaive"]
 
 
 
