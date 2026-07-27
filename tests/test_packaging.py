@@ -7,3 +7,9 @@ def test_compose_uses_named_volume_for_sqlite_state():
     assert "market-message-data:/app/data" in compose
     assert "./data:/app/data" not in compose
     assert "\nvolumes:\n  market-message-data:" in compose
+
+
+def test_dockerfile_copies_app_directory():
+    dockerfile = Path("Dockerfile").read_text()
+    assert "COPY app ./app" in dockerfile
+
