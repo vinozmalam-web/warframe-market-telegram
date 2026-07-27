@@ -1,0 +1,408 @@
+(function () {
+  'use strict';
+
+  // Telegram WebApp Initialization
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+  }
+
+  const initData = tg?.initData || '';
+
+  // State
+  let weapons = [];
+  let attributes = [];
+  let rules = [];
+  let currentPosStatCount = 0;
+
+  // DOM Elements
+  const activeRulesBadge = document.getElementById('activeRulesBadge');
+  const rulesListContainer = document.getElementById('rulesListContainer');
+  const openAddModalBtn = document.getElementById('openAddModalBtn');
+  const ruleModalOverlay = document.getElementById('ruleModalOverlay');
+  const closeModalBtn = document.getElementById('closeModalBtn');
+  const ruleForm = document.getElementById('ruleForm');
+  const modalTitleText = document.getElementById('modalTitleText');
+
+  const ruleIdInput = document.getElementById('ruleIdInput');
+  const ruleNameInput = document.getElementById('ruleNameInput');
+  const weaponSelect = document.getElementById('weaponSelect');
+  const minPriceInput = document.getElementById('minPriceInput');
+  const maxPriceInput = document.getElementById('maxPriceInput');
+  const minRerollsInput = document.getElementById('minRerollsInput');
+  const maxRerollsInput = document.getElementById('maxRerollsInput');
+  const sellerStatusSelect = document.getElementById('sellerStatusSelect');
+
+  const addPosStatBtn = document.getElementById('addPosStatBtn');
+  const posStatsContainer = document.getElementById('posStatsContainer');
+  const negModeSelect = document.getElementById('negModeSelect');
+  const specificNegGroup = document.getElementById('specificNegGroup');
+  const negStatSelect = document.getElementById('negStatSelect');
+  const negMinInput = document.getElementById('negMinInput');
+  const negMaxInput = document.getElementById('negMaxInput');
+  const toastMessage = document.getElementById('toastMessage');
+
+  // Load initial data
+  init();
+
+  async function init() {
+    setupEventListeners();
+    await fetchMetadata();
+    await fetchRules();
+  }
+
+  function setupEventListeners() {
+    openAddModalBtn.addEventListener('click', () => openModal());
+    closeModalBtn.addEventListener('click', closeModal);
+    ruleModalOverlay.addEventListener('click', (e) => {
+      if (e.target === ruleModalOverlay) closeModal();
+    });
+
+    addPosStatBtn.addEventListener('click', () => addPosStatRow());
+    negModeSelect.addEventListener('change', () => {
+      specificNegGroup.style.display = negModeSelect.value === 'specific' ? 'block' : 'none';
+    });
+
+    ruleForm.addEventListener('submit', handleFormSubmit);
+  }
+
+  async function fetchMetadata() {
+    try {
+      const res = await fetch('/api/riven/meta');
+      if (!res.ok) return;
+      const data = await res.json();
+      weapons = data.weapons || [];
+      attributes = data.attributes || [];
+
+      populateWeaponSelect();
+      populateNegAttributeSelect();
+    } catch (err) {
+      console.error('Failed to load metadata:', err);
+    }
+  }
+
+  function populateWeaponSelect() {
+    weaponSelect.innerHTML = '<option value="*">✨ Любое оружие (Any Weapon)</option>';
+    weapons.sort((a, b) => a.item_name.localeCompare(b.item_name)).forEach(w => {
+      const opt = document.createElement('option');
+      opt.value = w.url_name;
+      opt.textContent = `${w.item_name} (${w.group})`;
+      weaponSelect.appendChild(opt);
+    });
+  }
+
+  function populateNegAttributeSelect() {
+    negStatSelect.innerHTML = '';
+    attributes.sort((a, b) => a.effect.localeCompare(b.effect)).forEach(attr => {
+      const opt = document.createElement('option');
+      opt.value = attr.url_name;
+      opt.textContent = attr.effect;
+      negStatSelect.appendChild(opt);
+    });
+  }
+
+  async function fetchRules() {
+    try {
+      const res = await fetch('/api/rules');
+      if (!res.ok) return;
+      rules = await res.json();
+      renderRules();
+    } catch (err) {
+      console.error('Failed to load rules:', err);
+    }
+  }
+
+  function renderRules() {
+    const activeCount = rules.filter(r => r.is_active).length;
+    activeRulesBadge.textContent = `${activeCount} Активно`;
+
+    if (rules.length === 0) {
+      rulesListContainer.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🔎</div>
+          <p>У вас пока нет настроенных правил</p>
+          <p style="font-size: 12px; margin-top: 6px;">Нажмите "+ Новое правило", чтобы добавить снайпер ривенов.</p>
+        </div>
+      `;
+      return;
+    }
+
+    rulesListContainer.innerHTML = '';
+    rules.forEach(rule => {
+      const card = document.createElement('div');
+      card.className = `rule-card ${rule.is_active ? '' : 'inactive'}`;
+
+      const weaponName = rule.weapon_url_name === '*' ? 'Любое оружие' : (
+        weapons.find(w => w.url_name === rule.weapon_url_name)?.item_name || rule.weapon_url_name
+      );
+
+      const priceText = rule.max_price ? `до ${rule.max_price} 💎` : 'любая цена';
+      const rerollsText = rule.max_rerolls !== null ? `роллы <= ${rule.max_rerolls}` : '';
+
+      let posTags = (rule.positive_stats || []).map(p => {
+        const attrObj = attributes.find(a => a.url_name === p.url_name);
+        const name = attrObj ? attrObj.effect : p.url_name;
+        const minStr = p.min_value ? `>=${p.min_value}%` : '';
+        return `<span class="tag tag-pos">+ ${name} ${minStr}</span>`;
+      }).join(' ');
+
+      let negTag = '';
+      if (rule.negative_stat?.mode === 'none') {
+        negTag = '<span class="tag tag-neg">Без негатива</span>';
+      } else if (rule.negative_stat?.mode === 'any') {
+        negTag = '<span class="tag tag-neg">Любой негатив</span>';
+      } else if (rule.negative_stat?.mode === 'specific') {
+        const attrObj = attributes.find(a => a.url_name === rule.negative_stat.url_name);
+        const name = attrObj ? attrObj.effect : rule.negative_stat.url_name;
+        negTag = `<span class="tag tag-neg">- ${name}</span>`;
+      }
+
+      card.innerHTML = `
+        <div class="rule-header">
+          <div>
+            <div class="rule-title">${escapeHtml(rule.name)}</div>
+            <div class="rule-target">🔫 ${escapeHtml(weaponName)} • 💰 ${priceText} ${rerollsText ? '• 🔄 ' + rerollsText : ''}</div>
+          </div>
+          <div class="rule-actions">
+            <label class="toggle-switch">
+              <input type="checkbox" ${rule.is_active ? 'checked' : ''} data-id="${rule.id}" class="rule-toggle">
+              <span class="slider"></span>
+            </label>
+            <button class="icon-btn edit-rule-btn" data-id="${rule.id}" title="Редактировать">✏️</button>
+            <button class="icon-btn delete-rule-btn" data-id="${rule.id}" title="Удалить">🗑️</button>
+          </div>
+        </div>
+        <div class="rule-details">
+          <span class="tag">Статус продавца: ${rule.seller_status}</span>
+          ${posTags}
+          ${negTag}
+        </div>
+      `;
+
+      rulesListContainer.appendChild(card);
+    });
+
+    // Add card action listeners
+    document.querySelectorAll('.rule-toggle').forEach(chk => {
+      chk.addEventListener('change', async (e) => {
+        const id = parseInt(e.target.dataset.id, 10);
+        const rule = rules.find(r => r.id === id);
+        if (rule) {
+          rule.is_active = e.target.checked;
+          await saveRule(rule);
+          renderRules();
+        }
+      });
+    });
+
+    document.querySelectorAll('.edit-rule-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = parseInt(btn.dataset.id, 10);
+        const rule = rules.find(r => r.id === id);
+        if (rule) openModal(rule);
+      });
+    });
+
+    document.querySelectorAll('.delete-rule-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.dataset.id, 10);
+        if (confirm('Удалить это правило снайпера?')) {
+          await deleteRule(id);
+        }
+      });
+    });
+  }
+
+  function addPosStatRow(existingData = null) {
+    if (currentPosStatCount >= 3) {
+      showToast('Максимум 3 позитивные характеристики');
+      return;
+    }
+
+    const rowId = `pos_stat_row_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+    const div = document.createElement('div');
+    div.className = 'stat-row';
+    div.id = rowId;
+
+    let optionsHtml = '';
+    attributes.sort((a, b) => a.effect.localeCompare(b.effect)).forEach(attr => {
+      const selected = existingData && existingData.url_name === attr.url_name ? 'selected' : '';
+      optionsHtml += `<option value="${attr.url_name}" ${selected}>${attr.effect}</option>`;
+    });
+
+    div.innerHTML = `
+      <div class="stat-header">
+        <span style="font-size: 12px; color: var(--accent-green); font-weight: 600;">+ Характеристика</span>
+        <button type="button" class="icon-btn remove-stat-btn" style="color: var(--accent-red); font-size: 14px;">✕</button>
+      </div>
+      <div class="form-group" style="margin-bottom: 8px;">
+        <select class="pos-stat-select">${optionsHtml}</select>
+      </div>
+      <div class="grid-2">
+        <input type="number" class="pos-min-input" placeholder="Мин %" step="0.1" value="${existingData?.min_value ?? ''}">
+        <input type="number" class="pos-max-input" placeholder="Макс %" step="0.1" value="${existingData?.max_value ?? ''}">
+      </div>
+    `;
+
+    posStatsContainer.appendChild(div);
+    currentPosStatCount++;
+
+    div.querySelector('.remove-stat-btn').addEventListener('click', () => {
+      div.remove();
+      currentPosStatCount--;
+    });
+  }
+
+  function openModal(rule = null) {
+    ruleForm.reset();
+    posStatsContainer.innerHTML = '';
+    currentPosStatCount = 0;
+
+    if (rule) {
+      modalTitleText.textContent = 'Редактировать правило';
+      ruleIdInput.value = rule.id;
+      ruleNameInput.value = rule.name;
+      weaponSelect.value = rule.weapon_url_name || '*';
+      minPriceInput.value = rule.min_price ?? '';
+      maxPriceInput.value = rule.max_price ?? '';
+      minRerollsInput.value = rule.min_rerolls ?? '';
+      maxRerollsInput.value = rule.max_rerolls ?? '';
+      sellerStatusSelect.value = rule.seller_status || 'ingame';
+
+      (rule.positive_stats || []).forEach(p => addPosStatRow(p));
+
+      negModeSelect.value = rule.negative_stat?.mode || 'any_or_none';
+      specificNegGroup.style.display = negModeSelect.value === 'specific' ? 'block' : 'none';
+      if (rule.negative_stat?.url_name) {
+        negStatSelect.value = rule.negative_stat.url_name;
+      }
+      negMinInput.value = rule.negative_stat?.min_value ?? '';
+      negMaxInput.value = rule.negative_stat?.max_value ?? '';
+    } else {
+      modalTitleText.textContent = 'Создать новое правило';
+      ruleIdInput.value = '';
+      weaponSelect.value = '*';
+      sellerStatusSelect.value = 'ingame';
+      negModeSelect.value = 'any_or_none';
+      specificNegGroup.style.display = 'none';
+      addPosStatRow();
+    }
+
+    ruleModalOverlay.classList.add('active');
+  }
+
+  function closeModal() {
+    ruleModalOverlay.classList.remove('active');
+  }
+
+  async function handleFormSubmit(e) {
+    e.preventDefault();
+
+    const positive_stats = [];
+    posStatsContainer.querySelectorAll('.stat-row').forEach(row => {
+      const sel = row.querySelector('.pos-stat-select');
+      const minIn = row.querySelector('.pos-min-input');
+      const maxIn = row.querySelector('.pos-max-input');
+      if (sel && sel.value) {
+        positive_stats.push({
+          url_name: sel.value,
+          min_value: minIn.value ? parseFloat(minIn.value) : null,
+          max_value: maxIn.value ? parseFloat(maxIn.value) : null,
+        });
+      }
+    });
+
+    const negMode = negModeSelect.value;
+    let negative_stat = { mode: negMode };
+    if (negMode === 'specific') {
+      negative_stat = {
+        mode: 'specific',
+        url_name: negStatSelect.value,
+        min_value: negMinInput.value ? parseFloat(negMinInput.value) : null,
+        max_value: negMaxInput.value ? parseFloat(negMaxInput.value) : null,
+      };
+    }
+
+    const payload = {
+      id: ruleIdInput.value ? parseInt(ruleIdInput.value, 10) : null,
+      name: ruleNameInput.value.trim() || 'Riven Rule',
+      item_type: 'riven',
+      weapon_url_name: weaponSelect.value,
+      target_name: weaponSelect.options[weaponSelect.selectedIndex]?.text || 'Any Weapon',
+      min_price: minPriceInput.value ? parseInt(minPriceInput.value, 10) : null,
+      max_price: maxPriceInput.value ? parseInt(maxPriceInput.value, 10) : null,
+      min_rerolls: minRerollsInput.value ? parseInt(minRerollsInput.value, 10) : null,
+      max_rerolls: maxRerollsInput.value ? parseInt(maxRerollsInput.value, 10) : null,
+      seller_status: sellerStatusSelect.value,
+      positive_stats: positive_stats,
+      negative_stat: negative_stat,
+      is_active: true,
+      initData: initData,
+    };
+
+    await saveRule(payload);
+    closeModal();
+    await fetchRules();
+    showToast('Правило успешно сохранено');
+  }
+
+  async function saveRule(ruleData) {
+    const isUpdate = Boolean(ruleData.id);
+    const url = isUpdate ? `/api/rules/${ruleData.id}` : '/api/rules';
+    const method = isUpdate ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': initData,
+        },
+        body: JSON.stringify(ruleData),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || 'Ошибка сохранения');
+      }
+    } catch (err) {
+      console.error('Save rule error:', err);
+      showToast('Ошибка сети при сохранении');
+    }
+  }
+
+  async function deleteRule(id) {
+    try {
+      const res = await fetch(`/api/rules/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'X-Telegram-Init-Data': initData,
+        },
+      });
+
+      if (res.ok) {
+        showToast('Правило удалено');
+        await fetchRules();
+      } else {
+        showToast('Не удалось удалить правило');
+      }
+    } catch (err) {
+      console.error('Delete rule error:', err);
+    }
+  }
+
+  function showToast(msg) {
+    toastMessage.textContent = msg;
+    toastMessage.classList.add('show');
+    setTimeout(() => {
+      toastMessage.classList.remove('show');
+    }, 2500);
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+})();

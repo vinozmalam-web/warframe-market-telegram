@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -31,3 +31,99 @@ class TelegramIncomingMessage:
 class TelegramUpdate:
     update_id: int
     message: TelegramIncomingMessage | None
+
+
+@dataclass(frozen=True)
+class RivenAttribute:
+    url_name: str
+    effect: str
+    units: str | None = None
+    positive_is_negative: bool = False
+    group: str | None = None
+
+
+@dataclass(frozen=True)
+class RivenItem:
+    url_name: str
+    item_name: str
+    group: str
+    riven_type: str | None = None
+    icon: str | None = None
+
+
+@dataclass(frozen=True)
+class AuctionAttribute:
+    url_name: str
+    positive: bool
+    value: float
+
+
+@dataclass(frozen=True)
+class AuctionItem:
+    id: str
+    weapon_url_name: str
+    riven_name: str
+    attributes: list[AuctionAttribute]
+    buyout_price: int | None
+    starting_price: int | None
+    rerolls: int
+    mastery_rank: int
+    polarity: str
+    seller_name: str
+    seller_status: str
+    is_direct_sell: bool = True
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+@dataclass
+class SniperRule:
+    id: int | None = None
+    name: str = ""
+    item_type: str = "riven"
+    weapon_url_name: str = "*"
+    target_name: str = "Any Weapon"
+    min_price: int | None = None
+    max_price: int | None = None
+    min_rerolls: int | None = None
+    max_rerolls: int | None = None
+    seller_status: str = "any"
+    positive_stats: list[dict] = field(default_factory=list)
+    negative_stat: dict = field(default_factory=dict)
+    is_active: bool = True
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "item_type": self.item_type,
+            "weapon_url_name": self.weapon_url_name,
+            "target_name": self.target_name,
+            "min_price": self.min_price,
+            "max_price": self.max_price,
+            "min_rerolls": self.min_rerolls,
+            "max_rerolls": self.max_rerolls,
+            "seller_status": self.seller_status,
+            "positive_stats": self.positive_stats,
+            "negative_stat": self.negative_stat,
+            "is_active": self.is_active,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SniperRule":
+        return cls(
+            id=data.get("id"),
+            name=data.get("name") or "Unnamed Rule",
+            item_type=data.get("item_type") or "riven",
+            weapon_url_name=data.get("weapon_url_name") or "*",
+            target_name=data.get("target_name") or "Any Weapon",
+            min_price=data.get("min_price"),
+            max_price=data.get("max_price"),
+            min_rerolls=data.get("min_rerolls"),
+            max_rerolls=data.get("max_rerolls"),
+            seller_status=data.get("seller_status") or "any",
+            positive_stats=data.get("positive_stats") or [],
+            negative_stat=data.get("negative_stat") or {},
+            is_active=data.get("is_active", True),
+        )
+

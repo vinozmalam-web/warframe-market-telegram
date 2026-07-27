@@ -25,6 +25,9 @@ class Config:
     api_base_url: str = "https://api.warframe.market/v1"
     telegram_api_base_url: str = "https://api.telegram.org"
     request_timeout_seconds: float = 20.0
+    web_port: int = 8080
+    web_app_url: str = ""
+    riven_poll_interval_seconds: int = 5
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Config":
@@ -56,9 +59,16 @@ class Config:
         if poll_interval_seconds < 5:
             raise ConfigError("POLL_INTERVAL_SECONDS must be at least 5")
 
+        riven_poll_interval_seconds = _int_env(values, "RIVEN_POLL_INTERVAL_SECONDS", 5)
+        if riven_poll_interval_seconds < 1:
+            raise ConfigError("RIVEN_POLL_INTERVAL_SECONDS must be at least 1")
+
         request_timeout_seconds = _float_env(values, "REQUEST_TIMEOUT_SECONDS", 20.0)
         if request_timeout_seconds <= 0:
             raise ConfigError("REQUEST_TIMEOUT_SECONDS must be greater than 0")
+
+        web_port = _int_env(values, "WEB_PORT", 8080)
+        web_app_url = _get(values, "WEB_APP_URL") or ""
 
         return cls(
             warframe_email=warframe_email or "",
@@ -74,6 +84,9 @@ class Config:
             api_base_url=(_get(values, "WARFRAME_MARKET_API_BASE_URL") or "https://api.warframe.market/v1").rstrip("/"),
             telegram_api_base_url=(_get(values, "TELEGRAM_API_BASE_URL") or "https://api.telegram.org").rstrip("/"),
             request_timeout_seconds=request_timeout_seconds,
+            web_port=web_port,
+            web_app_url=web_app_url,
+            riven_poll_interval_seconds=riven_poll_interval_seconds,
         )
 
 

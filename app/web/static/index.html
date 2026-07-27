@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Warframe Market Riven Sniper</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">🎯</div>
+      <div>
+        <h1>WFM Sniper</h1>
+        <div style="font-size: 11px; color: var(--text-muted);">Warframe Market Lot Hunter</div>
+      </div>
+    </div>
+    <div class="badge" id="activeRulesBadge">0 Активно</div>
+  </header>
+
+  <main>
+    <div class="section-header">
+      <div class="section-title">Правила снайпера</div>
+      <button type="button" class="btn-primary" id="openAddModalBtn">+ Новое правило</button>
+    </div>
+
+    <div class="rules-list" id="rulesListContainer">
+      <div class="empty-state">
+        <div class="empty-state-icon">🔎</div>
+        <p>У вас пока нет настроенных правил</p>
+        <p style="font-size: 12px; margin-top: 6px;">Нажмите "+ Новое правило", чтобы добавить снайпер ривенов.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal Drawer -->
+  <div class="modal-overlay" id="ruleModalOverlay">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitleText">Создать новое правило</div>
+        <button type="button" class="close-btn" id="closeModalBtn">&times;</button>
+      </div>
+
+      <form id="ruleForm">
+        <input type="hidden" id="ruleIdInput" value="">
+
+        <div class="form-group">
+          <label for="ruleNameInput">Название правила</label>
+          <input type="text" id="ruleNameInput" placeholder="Например: Rubico CC+CD" required>
+        </div>
+
+        <div class="form-group">
+          <label for="weaponSelect">Оружие</label>
+          <select id="weaponSelect" required>
+            <option value="*">✨ Любое оружие (Any Weapon)</option>
+          </select>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="minPriceInput">Мин. Цена (💎)</label>
+            <input type="number" id="minPriceInput" placeholder="0" min="0">
+          </div>
+          <div class="form-group">
+            <label for="maxPriceInput">Макс. Цена (💎)</label>
+            <input type="number" id="maxPriceInput" placeholder="2000" min="0">
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="minRerollsInput">Мин. Роллы</label>
+            <input type="number" id="minRerollsInput" placeholder="0" min="0">
+          </div>
+          <div class="form-group">
+            <label for="maxRerollsInput">Макс. Роллы</label>
+            <input type="number" id="maxRerollsInput" placeholder="10" min="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="sellerStatusSelect">Статус продавца</label>
+          <select id="sellerStatusSelect">
+            <option value="any">Любой (Offline / Online / In Game)</option>
+            <option value="online">Онлайн на сайте или в игре</option>
+            <option value="ingame" selected>Только в игре (In Game)</option>
+          </select>
+        </div>
+
+        <!-- Positive Stats Section -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="margin-bottom: 0;">Позитивные характеристики</label>
+            <button type="button" class="btn-primary" id="addPosStatBtn" style="padding: 4px 10px; font-size: 12px;">+ Добавить</button>
+          </div>
+          <div id="posStatsContainer">
+            <!-- Dynamic stat rows inserted here -->
+          </div>
+        </div>
+
+        <!-- Negative Stat Section -->
+        <div class="form-group">
+          <label for="negModeSelect">Негативная характеристика</label>
+          <select id="negModeSelect">
+            <option value="any_or_none">С негативом или без (Неважно)</option>
+            <option value="any">Обязательно любой негатив</option>
+            <option value="none">Строго без негатива (Безминус)</option>
+            <option value="specific">Конкретный негатив</option>
+          </select>
+        </div>
+
+        <div id="specificNegGroup" style="display: none;" class="stat-row">
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label for="negStatSelect">Характеристика негатива</label>
+            <select id="negStatSelect"></select>
+          </div>
+          <div class="grid-2">
+            <input type="number" id="negMinInput" placeholder="Мин %" step="0.1">
+            <input type="number" id="negMaxInput" placeholder="Макс %" step="0.1">
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 14px; margin-top: 10px;" id="saveRuleBtn">
+          Сохранить правило
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toastMessage">Сохранено</div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

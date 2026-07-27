@@ -8,7 +8,14 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .config import Config
-from .models import ChatSummary, IncomingMessage
+from .models import (
+    AuctionAttribute,
+    AuctionItem,
+    ChatSummary,
+    IncomingMessage,
+    RivenAttribute,
+    RivenItem,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +65,21 @@ class WarframeMarketClient:
 
     def get_chat(self, chat_id: str) -> dict[str, Any]:
         return self._request("GET", f"/im/chats/{chat_id}")
+
+    def get_riven_items(self) -> list[RivenItem]:
+        data = self._request("GET", "/riven/items")
+        return extract_riven_items(data)
+
+    def get_riven_attributes(self) -> list[RivenAttribute]:
+        data = self._request("GET", "/riven/attributes")
+        return extract_riven_attributes(data)
+
+    def search_auctions(self, type_: str = "riven", weapon_url_name: str | None = None) -> list[AuctionItem]:
+        path = f"/auctions/search?type={type_}"
+        if weapon_url_name and weapon_url_name != "*":
+            path += f"&weapon_url_name={weapon_url_name}"
+        data = self._request("GET", path)
+        return extract_auctions(data)
 
     def send_chat_message(self, chat_id: str, text: str) -> None:
         try:
@@ -283,3 +305,116 @@ class _CsrfParser(HTMLParser):
         attr_map = {key: value for key, value in attrs}
         if attr_map.get("name") == "csrf-token" and attr_map.get("content"):
             self.csrf_token = attr_map["content"]
+
+
+def extract_riven_items(data: dict[str, Any]) -> list[RivenItem]:
+    payload = _unwrap_payload(data)
+    items_raw = _extract_collection(payload, "items")
+    result: list[RivenItem] = []
+    for item in items_raw:
+        if not isinstance(item, dict):
+            continue
+        url_name = item.get("url_name")
+        item_name = item.get("item_name") or item.get("name")
+        if not url_name or not item_name:
+            continue
+        result.append(
+            RivenItem(
+                url_name=str(url_name),
+                item_name=str(item_name),
+                group=str(item.get("group", "primary")),
+                riven_type=_optional_str(item.get("riven_type")),
+                icon=_optional_str(item.get("icon")),
+            )
+        )
+    return result
+
+
+def extract_riven_attributes(data: dict[str, Any]) -> list[RivenAttribute]:
+    payload = _unwrap_payload(data)
+    attrs_raw = _extract_collection(payload, "attributes")
+    result: list[RivenAttribute] = []
+    for attr in attrs_raw:
+        if not isinstance(attr, dict):
+            continue
+        url_name = attr.get("url_name")
+        effect = attr.get("effect")
+        if not url_name or not effect:
+            continue
+        result.append(
+            RivenAttribute(
+                url_name=str(url_name),
+                effect=str(effect),
+                units=_optional_str(attr.get("units")),
+                positive_is_negative=bool(attr.get("positive_is_negative", False)),
+                group=_optional_str(attr.get("group")),
+            )
+        )
+    return result
+
+
+def extract_auctions(data: dict[str, Any]) -> list[AuctionItem]:
+    payload = _unwrap_payload(data)
+    auctions_raw = _extract_collection(payload, "auctions")
+    result: list[AuctionItem] = []
+
+    for auction in auctions_raw:
+        if not isinstance(auction, dict):
+            continue
+        auction_id = auction.get("id") or auction.get("_id")
+        item_dict = auction.get("item")
+        owner_dict = auction.get("owner")
+        if not auction_id or not isinstance(item_dict, dict) or not isinstance(owner_dict, dict):
+            continue
+
+        weapon_url_name = item_dict.get("weapon_url_name") or item_dict.get("url_name") or "*"
+        riven_name = item_dict.get("name") or item_dict.get("riven_name") or weapon_url_name
+        
+        attributes_raw = item_dict.get("attributes") or []
+        parsed_attrs: list[AuctionAttribute] = []
+        for attr in attributes_raw:
+            if isinstance(attr, dict) and "url_name" in attr and "value" in attr:
+                parsed_attrs.append(
+                    AuctionAttribute(
+                        url_name=str(attr["url_name"]),
+                        positive=bool(attr.get("positive", True)),
+                        value=float(attr["value"]),
+                    )
+                )
+
+        rerolls = item_dict.get("rerolls")
+        if rerolls is None:
+            rerolls = item_dict.get("re_rolls", 0)
+
+        seller_name = (
+            owner_dict.get("ingame_name")
+            or owner_dict.get("ingameName")
+            or owner_dict.get("slug")
+            or "Unknown"
+        )
+        seller_status = owner_dict.get("status") or "offline"
+
+        buyout_price = auction.get("buyout_price")
+        starting_price = auction.get("starting_price")
+
+        result.append(
+            AuctionItem(
+                id=str(auction_id),
+                weapon_url_name=str(weapon_url_name),
+                riven_name=str(riven_name),
+                attributes=parsed_attrs,
+                buyout_price=int(buyout_price) if buyout_price is not None else None,
+                starting_price=int(starting_price) if starting_price is not None else None,
+                rerolls=_safe_int(rerolls),
+                mastery_rank=_safe_int(item_dict.get("mastery_rank", 0)),
+                polarity=str(item_dict.get("polarity", "universal")),
+                seller_name=str(seller_name),
+                seller_status=str(seller_status),
+                is_direct_sell=bool(auction.get("is_direct_sell", True)),
+                created_at=_optional_str(auction.get("created")),
+                updated_at=_optional_str(auction.get("updated")),
+            )
+        )
+
+    return result
+

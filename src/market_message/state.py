@@ -1,8 +1,9 @@
-from __future__ import annotations
-
+import json
 import secrets
 import sqlite3
 from pathlib import Path
+
+from .models import SniperRule
 
 
 class StateStore:
@@ -99,6 +100,89 @@ class StateStore:
                 (key, value),
             )
 
+    def create_sniper_rule(self, rule: SniperRule) -> SniperRule:
+        rule_dict = rule.to_dict()
+        rule_data = json.dumps(rule_dict, ensure_ascii=False)
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO sniper_rules (name, item_type, is_active, data)
+                VALUES (?, ?, ?, ?)
+                """,
+                (rule.name, rule.item_type, 1 if rule.is_active else 0, rule_data),
+            )
+            rule_id = cursor.lastrowid
+            rule.id = rule_id
+            rule_data_with_id = json.dumps(rule.to_dict(), ensure_ascii=False)
+            conn.execute(
+                "UPDATE sniper_rules SET data = ? WHERE id = ?",
+                (rule_data_with_id, rule_id),
+            )
+        return rule
+
+    def get_sniper_rules(self) -> list[SniperRule]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT data FROM sniper_rules ORDER BY id DESC"
+            ).fetchall()
+        rules = []
+        for row in rows:
+            try:
+                data = json.loads(row[0])
+                rules.append(SniperRule.from_dict(data))
+            except Exception:
+                continue
+        return rules
+
+    def get_sniper_rule(self, rule_id: int) -> SniperRule | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT data FROM sniper_rules WHERE id = ?",
+                (rule_id,),
+            ).fetchone()
+        if not row:
+            return None
+        try:
+            return SniperRule.from_dict(json.loads(row[0]))
+        except Exception:
+            return None
+
+    def update_sniper_rule(self, rule: SniperRule) -> None:
+        if rule.id is None:
+            return
+        rule_data = json.dumps(rule.to_dict(), ensure_ascii=False)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE sniper_rules
+                SET name = ?, item_type = ?, is_active = ?, data = ?
+                WHERE id = ?
+                """,
+                (rule.name, rule.item_type, 1 if rule.is_active else 0, rule_data, rule.id),
+            )
+
+    def delete_sniper_rule(self, rule_id: int) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM sniper_rules WHERE id = ?", (rule_id,))
+
+    def was_auction_seen(self, auction_id: str) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM seen_auctions WHERE auction_id = ?",
+                (auction_id,),
+            ).fetchone()
+        return row is not None
+
+    def mark_auction_seen(self, auction_id: str, rule_id: int | None = None) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO seen_auctions (auction_id, rule_id)
+                VALUES (?, ?)
+                """,
+                (auction_id, rule_id),
+            )
+
     def _init_schema(self) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -128,6 +212,28 @@ class StateStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sniper_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    item_type TEXT NOT NULL DEFAULT 'riven',
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    data TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS seen_auctions (
+                    auction_id TEXT PRIMARY KEY,
+                    rule_id INTEGER,
+                    seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path)
+

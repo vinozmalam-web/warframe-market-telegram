@@ -17,9 +17,21 @@ services:
       WARFRAME_MARKET_API_BASE_URL: ${WARFRAME_MARKET_API_BASE_URL:-https://api.warframe.market/v1}
       TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org}
       REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-20}
+      WEB_PORT: ${WEB_PORT:-8080}
+      WEB_APP_URL: ${WEB_APP_URL:-}
+      RIVEN_POLL_INTERVAL_SECONDS: ${RIVEN_POLL_INTERVAL_SECONDS:-5}
+    ports:
+      - "8080:8080"
     restart: unless-stopped
     volumes:
       - market-message-data:/app/data
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: ${CLOUDFLARE_TUNNEL_COMMAND:-tunnel --no-autoupdate run --url http://market-message:8080}
+
 volumes:
   market-message-data:
+

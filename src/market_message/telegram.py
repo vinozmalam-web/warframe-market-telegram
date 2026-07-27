@@ -8,8 +8,38 @@ from .config import Config
 from .models import TelegramIncomingMessage, TelegramUpdate
 
 
+import hashlib
+import hmac
+from urllib.parse import parse_qsl
+
+
 class TelegramError(RuntimeError):
     """Raised when Telegram rejects a notification."""
+
+
+def validate_init_data(init_data: str, bot_token: str) -> bool:
+    if not init_data or not bot_token:
+        return False
+    try:
+        parsed_data = dict(parse_qsl(init_data, keep_blank_values=True))
+        received_hash = parsed_data.pop("hash", None)
+        if not received_hash:
+            return False
+
+        data_check_string = "\n".join(
+            f"{k}={v}" for k, v in sorted(parsed_data.items(), key=lambda item: item[0])
+        )
+
+        secret_key = hmac.new(
+            b"WebAppData", bot_token.encode("utf-8"), hashlib.sha256
+        ).digest()
+        calculated_hash = hmac.new(
+            secret_key, data_check_string.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+
+        return hmac.compare_digest(calculated_hash.lower(), received_hash.lower())
+    except Exception:
+        return False
 
 
 class TelegramClient:
@@ -20,7 +50,12 @@ class TelegramClient:
     def close(self) -> None:
         self._client.close()
 
-    def send_message(self, text: str) -> int | None:
+    def send_message(
+        self,
+        text: str,
+        parse_mode: str | None = None,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> int | None:
         url = (
             f"{self.config.telegram_api_base_url}/bot"
             f"{self.config.telegram_bot_token}/sendMessage"
@@ -30,6 +65,11 @@ class TelegramClient:
             "text": text,
             "disable_web_page_preview": True,
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+
         response = self._client.post(url, json=payload)
         data = self._parse_response(response)
         result = data.get("result")
