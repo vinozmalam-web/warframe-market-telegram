@@ -9,7 +9,7 @@
 - **`config.py`**
   - `Назначение`: Загрузка и валидация конфигурации приложения из переменных окружения.
   - `Точки входа`: `Config.from_env()`
-  - `Контракты`: Задает таймауты, интервалы опроса, токены Telegram, учетные данные Warframe Market и `web_app_secret_token`.
+  - `Контракты`: Задает таймауты, интервалы опроса, токены Telegram, учетные данные Warframe Market, `web_app_secret_token` и `WARFRAME_MARKET_MAX_RPS`.
 - **`models.py`**
   - `Назначение`: Структуры данных (dataclass) для сообщений, чатов, аукционов и правил снайпера.
   - `Точки входа`: `ChatMessage`, `AuctionItem`, `SniperRule`
@@ -20,7 +20,7 @@
 - **`warframe.py`**
   - `Назначение`: Клиент для работы с REST API и WebSocket Warframe Market (аутентификация, чаты, аукционы, справочники Riven v1/v2 и фолбэк-списки).
   - `Точки входа`: `WarframeMarketClient`, `extract_riven_items`, `extract_riven_attributes`, `FALLBACK_RIVEN_ITEMS`, `FALLBACK_RIVEN_ATTRIBUTES`
-  - `Контракты`: Использование токенов сессий, поддержка v2 API (`/v2/riven/weapons`, `/v2/riven/attributes`), статическая страховка при сбоях API, обработка ошибок авторизации и Cloudflare rate limits.
+  - `Контракты`: Использование токенов сессий, поддержка v2 API (`/v2/riven/weapons`, `/v2/riven/attributes`), ограничение частоты запросов (rate limit <= 3 RPS), автоматический retry при HTTP 429, статическая страховка при сбоях API, обработка ошибок авторизации.
 - **`telegram.py`**
   - `Назначение`: Клиент Telegram Bot API для отправки уведомлений, обработки reply, вызова Telegram Mini App и валидации `initData`.
   - `Точки входа`: `TelegramClient`, `validate_init_data`, `extract_user_from_init_data`

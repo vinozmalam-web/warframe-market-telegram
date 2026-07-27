@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import secrets
+import threading
+import time
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlparse
@@ -89,6 +91,10 @@ class WarframeMarketClient:
         self.device_id = device_id
         self.current_user_id: str | None = None
         self._csrf_token: str | None = None
+        self._rate_limit_lock = threading.Lock()
+        self._last_request_time: float = 0.0
+        max_rps = getattr(config, "warframe_max_requests_per_second", 3.0)
+        self._min_request_interval: float = 1.0 / max_rps if max_rps > 0 else 0.0
         import httpx
 
         self._client = httpx.Client(
@@ -206,8 +212,43 @@ class WarframeMarketClient:
         except Exception as exc:
             raise WarframeMarketError("Warframe Market WebSocket send failed") from exc
 
+    def _rate_limit(self) -> None:
+        if self._min_request_interval <= 0:
+            return
+        with self._rate_limit_lock:
+            now = time.monotonic()
+            elapsed = now - self._last_request_time
+            if elapsed < self._min_request_interval:
+                time.sleep(self._min_request_interval - elapsed)
+            self._last_request_time = time.monotonic()
+
+    def _send_request(self, method: str, url: str, headers: dict[str, str] | None = None, **kwargs: Any) -> Any:
+        max_retries = 3
+        req_headers = headers if headers is not None else {}
+        for attempt in range(max_retries + 1):
+            self._rate_limit()
+            response = self._client.request(method, url, headers=req_headers, **kwargs)
+            if response.status_code == 429 and attempt < max_retries:
+                retry_after_str = response.headers.get("Retry-After")
+                try:
+                    retry_after = float(retry_after_str) if retry_after_str else 2.0
+                except ValueError:
+                    retry_after = 2.0
+                logger.warning(
+                    "Warframe Market returned 429 Too Many Requests for %s %s. Retrying in %.1fs (attempt %d/%d)...",
+                    method,
+                    url,
+                    retry_after,
+                    attempt + 1,
+                    max_retries,
+                )
+                time.sleep(retry_after)
+                continue
+            return response
+        return response
+
     def _fetch_csrf_token(self) -> str:
-        response = self._client.get(self.config.market_base_url)
+        response = self._send_request("GET", self.config.market_base_url)
         response.raise_for_status()
         parser = _CsrfParser()
         parser.feed(response.text)
@@ -237,7 +278,7 @@ class WarframeMarketClient:
             url = f"{base_url}{path}"
         else:
             url = f"{self.config.api_base_url}{path}"
-        response = self._client.request(method, url, headers=headers, **kwargs)
+        response = self._send_request(method, url, headers=headers, **kwargs)
         if response.status_code in {401, 403}:
             raise AuthenticationError(f"Warframe Market returned {response.status_code}")
         if response.status_code >= 400:

@@ -161,3 +161,68 @@ def test_get_riven_meta_fallback(monkeypatch):
     assert len(attrs) == 32
     assert any(a.url_name == "critical_chance" for a in attrs)
 
+
+def test_warframe_client_rate_limiting(monkeypatch):
+    import time
+    config = Config(
+        warframe_email="seller@example.com",
+        warframe_password="secret",
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+        warframe_max_requests_per_second=10.0,
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+
+    class DummyResponse:
+        status_code = 200
+        def json(self):
+            return {"payload": {}}
+
+    monkeypatch.setattr(client._client, "request", lambda method, url, **kwargs: DummyResponse())
+
+    start_time = time.monotonic()
+    for _ in range(4):
+        client.list_chats()
+    elapsed = time.monotonic() - start_time
+
+    assert elapsed >= 0.25
+    client.close()
+
+
+def test_warframe_client_429_retry(monkeypatch):
+    config = Config(
+        warframe_email="seller@example.com",
+        warframe_password="secret",
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+        warframe_max_requests_per_second=1000.0,
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+
+    attempts = 0
+
+    class RateLimitedResponse:
+        status_code = 429
+        headers = {"Retry-After": "0.01"}
+
+    class SuccessResponse:
+        status_code = 200
+        headers = {}
+        def json(self):
+            return {"payload": {"chats": []}}
+
+    def fake_request(method, url, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            return RateLimitedResponse()
+        return SuccessResponse()
+
+    monkeypatch.setattr(client._client, "request", fake_request)
+
+    res = client.list_chats()
+    assert res == {"payload": {"chats": []}}
+    assert attempts == 3
+    client.close()
+
+

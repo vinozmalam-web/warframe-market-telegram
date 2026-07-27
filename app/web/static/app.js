@@ -8,15 +8,40 @@
     tg.expand();
   }
 
-  const initData = tg?.initData || '';
   const urlParams = new URLSearchParams(window.location.search);
   let authToken = urlParams.get('token') || localStorage.getItem('wfm_web_app_token') || '';
   if (urlParams.get('token')) {
     localStorage.setItem('wfm_web_app_token', urlParams.get('token'));
   }
 
+  function getInitData() {
+    if (tg?.initData) {
+      return tg.initData;
+    }
+    if (window.Telegram?.WebApp?.initData) {
+      return window.Telegram.WebApp.initData;
+    }
+    try {
+      const search = window.location.search || '';
+      const searchParams = new URLSearchParams(search);
+      if (searchParams.has('tgWebAppData')) return searchParams.get('tgWebAppData');
+      if (searchParams.has('initData')) return searchParams.get('initData');
+
+      const hash = window.location.hash || '';
+      if (hash.includes('tgWebAppData=')) {
+        const hashClean = hash.startsWith('#') ? hash.slice(1) : hash;
+        const hashParams = new URLSearchParams(hashClean);
+        if (hashParams.has('tgWebAppData')) return hashParams.get('tgWebAppData');
+      }
+    } catch (e) {
+      console.error('Failed to parse fallback initData:', e);
+    }
+    return '';
+  }
+
   function getAuthHeaders() {
     const headers = {};
+    const initData = getInitData();
     if (initData) {
       headers['X-Telegram-Init-Data'] = initData;
     }
@@ -443,7 +468,7 @@
       positive_stats: positive_stats,
       negative_stat: negative_stat,
       is_active: true,
-      initData: initData,
+      initData: getInitData(),
     };
 
     await saveRule(payload);

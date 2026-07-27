@@ -31,6 +31,7 @@ class Config:
     riven_poll_interval_seconds: int = 5
     max_alerts_per_rule_run: int = 3
     seen_auction_ttl_days: int = 7
+    warframe_max_requests_per_second: float = 3.0
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Config":
@@ -82,6 +83,10 @@ class Config:
         web_app_url = _get(values, "WEB_APP_URL") or ""
         web_app_secret_token = _get(values, "WEB_APP_SECRET_TOKEN") or _get(values, "WEB_APP_TOKEN") or ""
 
+        warframe_max_requests_per_second = _float_env(values, "WARFRAME_MARKET_MAX_RPS", 3.0)
+        if warframe_max_requests_per_second <= 0:
+            raise ConfigError("WARFRAME_MARKET_MAX_RPS must be greater than 0")
+
         return cls(
             warframe_email=warframe_email or "",
             warframe_password=warframe_password or "",
@@ -102,6 +107,7 @@ class Config:
             riven_poll_interval_seconds=riven_poll_interval_seconds,
             max_alerts_per_rule_run=max_alerts_per_rule_run,
             seen_auction_ttl_days=seen_auction_ttl_days,
+            warframe_max_requests_per_second=warframe_max_requests_per_second,
         )
 
 
