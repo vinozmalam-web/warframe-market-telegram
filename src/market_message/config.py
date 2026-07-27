@@ -27,6 +27,7 @@ class Config:
     request_timeout_seconds: float = 20.0
     web_port: int = 8080
     web_app_url: str = ""
+    web_app_secret_token: str = ""
     riven_poll_interval_seconds: int = 5
     max_alerts_per_rule_run: int = 3
     seen_auction_ttl_days: int = 7
@@ -79,6 +80,7 @@ class Config:
 
         web_port = _int_env(values, "WEB_PORT", 8080)
         web_app_url = _get(values, "WEB_APP_URL") or ""
+        web_app_secret_token = _get(values, "WEB_APP_SECRET_TOKEN") or _get(values, "WEB_APP_TOKEN") or ""
 
         return cls(
             warframe_email=warframe_email or "",
@@ -96,6 +98,7 @@ class Config:
             request_timeout_seconds=request_timeout_seconds,
             web_port=web_port,
             web_app_url=web_app_url,
+            web_app_secret_token=web_app_secret_token,
             riven_poll_interval_seconds=riven_poll_interval_seconds,
             max_alerts_per_rule_run=max_alerts_per_rule_run,
             seen_auction_ttl_days=seen_auction_ttl_days,

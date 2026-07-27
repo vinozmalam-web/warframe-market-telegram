@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 from pathlib import Path
@@ -11,7 +12,7 @@ from aiohttp import web
 from .config import Config
 from .models import SniperRule
 from .state import StateStore
-from .telegram import validate_init_data
+from .telegram import extract_user_from_init_data, validate_init_data
 from .warframe import WarframeMarketClient
 
 logger = logging.getLogger(__name__)
@@ -53,20 +54,43 @@ class WebServer:
             return web.FileResponse(index_path)
         return web.Response(text="index.html not found", status=404)
 
-    def _validate_request_init_data(self, request: web.Request, body_json: dict | None = None) -> bool:
-        # Check header
-        header_data = request.headers.get("X-Telegram-Init-Data")
-        if header_data and validate_init_data(header_data, self.config.telegram_bot_token):
-            return True
-        # Check body JSON
-        if body_json and isinstance(body_json, dict):
-            body_data = body_json.get("initData")
-            if body_data and validate_init_data(body_data, self.config.telegram_bot_token):
+    def _validate_request_auth(self, request: web.Request, body_json: dict | None = None) -> bool:
+        # 1. Check Secret Token if configured
+        secret_token = self.config.web_app_secret_token
+        if secret_token:
+            header_token = request.headers.get("X-Auth-Token")
+            query_token = request.query.get("token")
+            body_token = body_json.get("token") if isinstance(body_json, dict) else None
+            token = header_token or query_token or body_token
+            if token and hmac.compare_digest(token, secret_token):
                 return True
-        # Dev mode / unauthenticated fallback if bot token is not enforced in dev tests
+
+        # 2. Check Telegram initData
+        header_data = request.headers.get("X-Telegram-Init-Data")
+        query_data = request.query.get("initData")
+        body_data = body_json.get("initData") if isinstance(body_json, dict) else None
+        init_data = header_data or query_data or body_data
+
+        if init_data:
+            user = extract_user_from_init_data(init_data, self.config.telegram_bot_token)
+            if user:
+                user_id = str(user.get("id"))
+                if user_id and user_id == str(self.config.telegram_chat_id):
+                    return True
+                logger.warning(
+                    "Access denied for Telegram user_id=%s (expected %s)",
+                    user_id,
+                    self.config.telegram_chat_id,
+                )
+
         return False
 
     async def handle_riven_meta(self, request: web.Request) -> web.Response:
+        if not self._validate_request_auth(request):
+            return web.json_response(
+                {"error": "Unauthorized: Access restricted to bot owner"}, status=401
+            )
+
         if self._cached_riven_items is None or self._cached_riven_attributes is None:
             try:
                 loop = asyncio.get_running_loop()
@@ -107,6 +131,11 @@ class WebServer:
         )
 
     async def handle_get_rules(self, request: web.Request) -> web.Response:
+        if not self._validate_request_auth(request):
+            return web.json_response(
+                {"error": "Unauthorized: Access restricted to bot owner"}, status=401
+            )
+
         rules = self.state.get_sniper_rules()
         return web.json_response([r.to_dict() for r in rules])
 
@@ -114,14 +143,15 @@ class WebServer:
         try:
             body = await request.json()
         except Exception:
-            return web.json_response({"error": "Invalid JSON body"}, status=400)
+            body = None
 
-        # Validate initData for CSRF/auth protection
-        if not self._validate_request_init_data(request, body):
-            # If initData validation fails, allow only if no initData was sent but request has valid authorization or bypass in tests
-            header_data = request.headers.get("X-Telegram-Init-Data")
-            if header_data or body.get("initData"):
-                return web.json_response({"error": "Unauthorized: invalid initData signature"}, status=403)
+        if not self._validate_request_auth(request, body):
+            return web.json_response(
+                {"error": "Unauthorized: Access restricted to bot owner"}, status=401
+            )
+
+        if not isinstance(body, dict):
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
 
         try:
             rule_obj = SniperRule.from_dict(body)
@@ -140,12 +170,15 @@ class WebServer:
         try:
             body = await request.json()
         except Exception:
-            return web.json_response({"error": "Invalid JSON body"}, status=400)
+            body = None
 
-        if not self._validate_request_init_data(request, body):
-            header_data = request.headers.get("X-Telegram-Init-Data")
-            if header_data or body.get("initData"):
-                return web.json_response({"error": "Unauthorized: invalid initData signature"}, status=403)
+        if not self._validate_request_auth(request, body):
+            return web.json_response(
+                {"error": "Unauthorized: Access restricted to bot owner"}, status=401
+            )
+
+        if not isinstance(body, dict):
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
 
         existing = self.state.get_sniper_rule(rule_id)
         if not existing:
@@ -166,10 +199,10 @@ class WebServer:
         except ValueError:
             return web.json_response({"error": "Invalid rule ID"}, status=400)
 
-        if not self._validate_request_init_data(request):
-            header_data = request.headers.get("X-Telegram-Init-Data")
-            if header_data:
-                return web.json_response({"error": "Unauthorized: invalid initData signature"}, status=403)
+        if not self._validate_request_auth(request):
+            return web.json_response(
+                {"error": "Unauthorized: Access restricted to bot owner"}, status=401
+            )
 
         existing = self.state.get_sniper_rule(rule_id)
         if not existing:

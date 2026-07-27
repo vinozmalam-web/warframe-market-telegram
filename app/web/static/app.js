@@ -9,6 +9,22 @@
   }
 
   const initData = tg?.initData || '';
+  const urlParams = new URLSearchParams(window.location.search);
+  let authToken = urlParams.get('token') || localStorage.getItem('wfm_web_app_token') || '';
+  if (urlParams.get('token')) {
+    localStorage.setItem('wfm_web_app_token', urlParams.get('token'));
+  }
+
+  function getAuthHeaders() {
+    const headers = {};
+    if (initData) {
+      headers['X-Telegram-Init-Data'] = initData;
+    }
+    if (authToken) {
+      headers['X-Auth-Token'] = authToken;
+    }
+    return headers;
+  }
 
   // State
   let weapons = [];
@@ -48,8 +64,10 @@
 
   async function init() {
     setupEventListeners();
-    await fetchMetadata();
-    await fetchRules();
+    const okMeta = await fetchMetadata();
+    if (okMeta) {
+      await fetchRules();
+    }
   }
 
   function setupEventListeners() {
@@ -67,10 +85,45 @@
     ruleForm.addEventListener('submit', handleFormSubmit);
   }
 
+  function renderUnauthorizedState() {
+    activeRulesBadge.textContent = '🔒 Заблокировано';
+    openAddModalBtn.style.display = 'none';
+    rulesListContainer.innerHTML = `
+      <div class="empty-state" style="padding: 40px 20px;">
+        <div class="empty-state-icon" style="font-size: 48px; margin-bottom: 12px;">🔒</div>
+        <h3 style="margin-bottom: 8px; color: var(--text-primary);">Доступ ограничен</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5;">
+          Данный WEB_APP_URL доступен только владельцу бота через Telegram Mini App или по секретному токену.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; margin: 0 auto;">
+          <input type="password" id="tokenInputField" placeholder="Секретный токен (WEB_APP_SECRET_TOKEN)" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff; font-size: 14px;">
+          <button type="button" id="submitTokenBtn" class="btn-primary" style="justify-content: center; width: 100%; padding: 12px;">Войти по токену</button>
+        </div>
+      </div>
+    `;
+    const submitBtn = document.getElementById('submitTokenBtn');
+    const tokenInput = document.getElementById('tokenInputField');
+    if (submitBtn && tokenInput) {
+      submitBtn.addEventListener('click', () => {
+        const val = tokenInput.value.trim();
+        if (val) {
+          authToken = val;
+          localStorage.setItem('wfm_web_app_token', val);
+          openAddModalBtn.style.display = 'inline-flex';
+          init();
+        }
+      });
+    }
+  }
+
   async function fetchMetadata() {
     try {
-      const res = await fetch('/api/riven/meta');
-      if (!res.ok) return;
+      const res = await fetch('/api/riven/meta', { headers: getAuthHeaders() });
+      if (res.status === 401 || res.status === 403) {
+        renderUnauthorizedState();
+        return false;
+      }
+      if (!res.ok) return false;
       const data = await res.json();
       weapons = data.weapons || [];
       attributes = data.attributes || [];
@@ -78,8 +131,10 @@
       populateWeaponSelect();
       populateNegAttributeSelect();
       refreshPosStatSelects();
+      return true;
     } catch (err) {
       console.error('Failed to load metadata:', err);
+      return false;
     }
   }
 
@@ -148,12 +203,18 @@
 
   async function fetchRules() {
     try {
-      const res = await fetch('/api/rules');
-      if (!res.ok) return;
+      const res = await fetch('/api/rules', { headers: getAuthHeaders() });
+      if (res.status === 401 || res.status === 403) {
+        renderUnauthorizedState();
+        return false;
+      }
+      if (!res.ok) return false;
       rules = await res.json();
       renderRules();
+      return true;
     } catch (err) {
       console.error('Failed to load rules:', err);
+      return false;
     }
   }
 
@@ -397,12 +458,10 @@
     const method = isUpdate ? 'PUT' : 'POST';
 
     try {
+      const headers = Object.assign({ 'Content-Type': 'application/json' }, getAuthHeaders());
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': initData,
-        },
+        headers,
         body: JSON.stringify(ruleData),
       });
 
@@ -420,9 +479,7 @@
     try {
       const res = await fetch(`/api/rules/${id}`, {
         method: 'DELETE',
-        headers: {
-          'X-Telegram-Init-Data': initData,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (res.ok) {

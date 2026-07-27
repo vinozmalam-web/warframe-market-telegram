@@ -9,7 +9,7 @@
 - **`config.py`**
   - `Назначение`: Загрузка и валидация конфигурации приложения из переменных окружения.
   - `Точки входа`: `Config.from_env()`
-  - `Контракты`: Задает таймауты, интервалы опроса, токены Telegram и учетные данные Warframe Market.
+  - `Контракты`: Задает таймауты, интервалы опроса, токены Telegram, учетные данные Warframe Market и `web_app_secret_token`.
 - **`models.py`**
   - `Назначение`: Структуры данных (dataclass) для сообщений, чатов, аукционов и правил снайпера.
   - `Точки входа`: `ChatMessage`, `AuctionItem`, `SniperRule`
@@ -22,16 +22,16 @@
   - `Точки входа`: `WarframeMarketClient`, `extract_riven_items`, `extract_riven_attributes`, `FALLBACK_RIVEN_ITEMS`, `FALLBACK_RIVEN_ATTRIBUTES`
   - `Контракты`: Использование токенов сессий, поддержка v2 API (`/v2/riven/weapons`, `/v2/riven/attributes`), статическая страховка при сбоях API, обработка ошибок авторизации и Cloudflare rate limits.
 - **`telegram.py`**
-  - `Назначение`: Клиент Telegram Bot API для отправки уведомлений, обработки reply и вызова Telegram Mini App.
-  - `Точки входа`: `TelegramClient`
+  - `Назначение`: Клиент Telegram Bot API для отправки уведомлений, обработки reply, вызова Telegram Mini App и валидации `initData`.
+  - `Точки входа`: `TelegramClient`, `validate_init_data`, `extract_user_from_init_data`
 - **`sniper.py`**
   - `Назначение`: Движок фильтрации и снайпинга лотов по правилам пользователя.
   - `Точки входа`: `RivenSniperEngine`
   - `Контракты`: Ограничение отправки уведомлений за один проход по широким правилам (`MAX_ALERTS_PER_RULE_RUN`), отслеживание снижения цен на ранее найденных лотах, автоматическая очистка устаревших лотов (`SEEN_AUCTION_TTL_DAYS`), сводная сводка в Telegram для защиты от спама.
 - **`web.py`**
   - `Назначение`: HTTP-сервер для обработки запросов Telegram Mini App и отдачи статики.
-  - `Точки входа`: `run_web_server()`, `WebServer.handle_index`
-  - `Контракты`: Проверка `initData` Telegram на безопасность в state-changing эндпоинтах, отдача `index.html` по умолчанию для `/` (без листинга файлов директории).
+  - `Точки входа`: `run_web_server()`, `WebServer.handle_index`, `WebServer._validate_request_auth`
+  - `Контракты`: Строгая авторизация всех API эндпоинтов по подписи `initData` Telegram с проверкой `user.id == TELEGRAM_CHAT_ID` или по `WEB_APP_SECRET_TOKEN`, отдача `index.html` по умолчанию для `/` (без листинга файлов директории).
 - **`forwarder.py`**
   - `Назначение`: Связующая логика между Warframe Market и Telegram для пересылки входящих сообщений.
   - `Точки входа`: `MessageForwarder`

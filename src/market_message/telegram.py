@@ -8,6 +8,7 @@ from .config import Config
 from .models import TelegramIncomingMessage, TelegramUpdate
 
 
+import json
 import hashlib
 import hmac
 from urllib.parse import parse_qsl
@@ -40,6 +41,23 @@ def validate_init_data(init_data: str, bot_token: str) -> bool:
         return hmac.compare_digest(calculated_hash.lower(), received_hash.lower())
     except Exception:
         return False
+
+
+def extract_user_from_init_data(init_data: str, bot_token: str) -> dict[str, Any] | None:
+    if not validate_init_data(init_data, bot_token):
+        return None
+    try:
+        parsed_data = dict(parse_qsl(init_data, keep_blank_values=True))
+        user_str = parsed_data.get("user")
+        if not user_str:
+            return None
+        user_obj = json.loads(user_str)
+        if isinstance(user_obj, dict):
+            return user_obj
+        return None
+    except Exception:
+        return None
+
 
 
 class TelegramClient:
