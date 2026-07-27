@@ -120,6 +120,7 @@ def test_extract_riven_items_and_attributes_v2():
     assert len(weapons) == 1
     assert weapons[0].url_name == "kulstar"
     assert weapons[0].item_name == "Кулстар"
+    assert weapons[0].ru_name == "Кулстар"
     assert weapons[0].group == "secondary"
     assert weapons[0].riven_type == "pistol"
 
@@ -155,7 +156,8 @@ def test_get_riven_meta_fallback(monkeypatch):
 
     weapons = client.get_riven_items()
     assert len(weapons) > 0
-    assert any(w.url_name == "rubico" for w in weapons)
+    rubico = next(w for w in weapons if w.url_name == "rubico")
+    assert rubico.ru_name == "Рубико"
 
     attrs = client.get_riven_attributes()
     assert len(attrs) == 32

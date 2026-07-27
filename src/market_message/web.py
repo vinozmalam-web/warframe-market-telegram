@@ -119,44 +119,45 @@ class WebServer:
                 {"error": "Unauthorized: Access restricted to bot owner"}, status=401
             )
 
-        if self._cached_riven_items is None or self._cached_riven_attributes is None:
-            try:
-                loop = asyncio.get_running_loop()
-                items = await loop.run_in_executor(None, self.warframe.get_riven_items)
-                attrs = await loop.run_in_executor(None, self.warframe.get_riven_attributes)
-                self._cached_riven_items = [
-                    {
-                        "url_name": item.url_name,
-                        "item_name": item.item_name,
-                        "group": item.group,
-                        "riven_type": item.riven_type,
-                        "icon": item.icon,
-                    }
-                    for item in items
-                ]
-                self._cached_riven_attributes = [
-                    {
-                        "url_name": attr.url_name,
-                        "effect": attr.effect,
-                        "units": attr.units,
-                        "positive_is_negative": attr.positive_is_negative,
-                        "group": attr.group,
-                    }
-                    for attr in attrs
-                ]
-            except Exception as exc:
-                logger.warning("Failed to fetch riven metadata from warframe.market: %s", exc)
-                return web.json_response(
-                    {"error": "Failed to fetch riven metadata", "weapons": [], "attributes": []},
-                    status=500,
-                )
+        item_type = request.query.get("type", "riven")
 
-        return web.json_response(
-            {
-                "weapons": self._cached_riven_items or [],
-                "attributes": self._cached_riven_attributes or [],
-            }
-        )
+        try:
+            loop = asyncio.get_running_loop()
+            items = await loop.run_in_executor(None, self.warframe.get_items_by_type, item_type)
+            attrs = await loop.run_in_executor(None, self.warframe.get_riven_attributes)
+            formatted_items = [
+                {
+                    "url_name": item.url_name,
+                    "item_name": item.item_name,
+                    "ru_name": item.ru_name,
+                    "group": item.group,
+                    "riven_type": item.riven_type,
+                    "icon": item.icon,
+                }
+                for item in items
+            ]
+            formatted_attrs = [
+                {
+                    "url_name": attr.url_name,
+                    "effect": attr.effect,
+                    "units": attr.units,
+                    "positive_is_negative": attr.positive_is_negative,
+                    "group": attr.group,
+                }
+                for attr in attrs
+            ]
+            return web.json_response(
+                {
+                    "weapons": formatted_items,
+                    "attributes": formatted_attrs,
+                }
+            )
+        except Exception as exc:
+            logger.warning("Failed to fetch metadata for %s from warframe.market: %s", item_type, exc)
+            return web.json_response(
+                {"error": f"Failed to fetch metadata for {item_type}", "weapons": [], "attributes": []},
+                status=500,
+            )
 
     async def handle_get_rules(self, request: web.Request) -> web.Response:
         if not self._validate_request_auth(request):

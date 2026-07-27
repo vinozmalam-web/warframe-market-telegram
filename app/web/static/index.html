@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Warframe Market Riven Sniper</title>
+  <title>Warframe Market Riven & Lich Sniper</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="/style.css?v=7">
+  <link rel="stylesheet" href="/style.css?v=9">
 </head>
 <body>
 
@@ -30,7 +30,7 @@
       <div class="empty-state">
         <div class="empty-state-icon">🔎</div>
         <p>У вас пока нет настроенных правил</p>
-        <p style="font-size: 12px; margin-top: 6px;">Нажмите "+ Новое правило", чтобы добавить снайпер ривенов.</p>
+        <p style="font-size: 12px; margin-top: 6px;">Нажмите "+ Новое правило", чтобы добавить снайпер лотов.</p>
       </div>
     </div>
   </main>
@@ -47,8 +47,17 @@
         <input type="hidden" id="ruleIdInput" value="">
 
         <div class="form-group">
+          <label for="itemTypeSelect">Тип поиска</label>
+          <select id="itemTypeSelect">
+            <option value="riven" selected>🎯 Riven-мод</option>
+            <option value="kuva_lich">🔴 Кува Лич</option>
+            <option value="sister_of_parvos">🔵 Сестра Парвоса</option>
+          </select>
+        </div>
+
+        <div class="form-group">
           <label for="ruleNameInput">Название правила</label>
-          <input type="text" id="ruleNameInput" placeholder="Например: Rubico CC+CD" required>
+          <input type="text" id="ruleNameInput" placeholder="Например: Rubico CC+CD или Zarr Toxin >50%" required>
         </div>
 
         <div class="form-group">
@@ -69,17 +78,6 @@
           </div>
         </div>
 
-        <div class="grid-2">
-          <div class="form-group">
-            <label for="minRerollsInput">Мин. Роллы</label>
-            <input type="number" id="minRerollsInput" placeholder="0" min="0">
-          </div>
-          <div class="form-group">
-            <label for="maxRerollsInput">Макс. Роллы</label>
-            <input type="number" id="maxRerollsInput" placeholder="10" min="0">
-          </div>
-        </div>
-
         <div class="form-group">
           <label for="sellerStatusSelect">Статус продавца</label>
           <select id="sellerStatusSelect">
@@ -89,36 +87,95 @@
           </select>
         </div>
 
-        <!-- Positive Stats Section -->
-        <div class="form-group">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <label style="margin-bottom: 0;">Позитивные характеристики</label>
-            <button type="button" class="btn-primary" id="addPosStatBtn" style="padding: 4px 10px; font-size: 12px;">+ Добавить</button>
-          </div>
-          <div id="posStatsContainer">
-            <!-- Dynamic stat rows inserted here -->
-          </div>
-        </div>
-
-        <!-- Negative Stat Section -->
-        <div class="form-group">
-          <label for="negModeSelect">Негативная характеристика</label>
-          <select id="negModeSelect">
-            <option value="any_or_none">С негативом или без (Неважно)</option>
-            <option value="any">Обязательно любой негатив</option>
-            <option value="none">Строго без негатива (Безминус)</option>
-            <option value="specific">Конкретный негатив</option>
-          </select>
-        </div>
-
-        <div id="specificNegGroup" style="display: none;" class="stat-row">
-          <div class="form-group" style="margin-bottom: 8px;">
-            <label for="negStatSelect">Характеристика негатива</label>
-            <select id="negStatSelect"></select>
-          </div>
+        <!-- Riven Specific Fields -->
+        <div id="rivenSection">
           <div class="grid-2">
-            <input type="number" id="negMinInput" placeholder="Мин %" step="0.1">
-            <input type="number" id="negMaxInput" placeholder="Макс %" step="0.1">
+            <div class="form-group">
+              <label for="minRerollsInput">Мин. Роллы</label>
+              <input type="number" id="minRerollsInput" placeholder="0" min="0">
+            </div>
+            <div class="form-group">
+              <label for="maxRerollsInput">Макс. Роллы</label>
+              <input type="number" id="maxRerollsInput" placeholder="10" min="0">
+            </div>
+          </div>
+
+          <!-- Positive Stats Section -->
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label style="margin-bottom: 0;">Позитивные характеристики</label>
+              <button type="button" class="btn-primary" id="addPosStatBtn" style="padding: 4px 10px; font-size: 12px;">+ Добавить</button>
+            </div>
+            <div id="posStatsContainer">
+              <!-- Dynamic stat rows inserted here -->
+            </div>
+          </div>
+
+          <!-- Negative Stat Section -->
+          <div class="form-group">
+            <label for="negModeSelect">Негативная характеристика</label>
+            <select id="negModeSelect">
+              <option value="any_or_none">С негативом или без (Неважно)</option>
+              <option value="any">Обязательно любой негатив</option>
+              <option value="none">Строго без негатива (Безминус)</option>
+              <option value="specific">Конкретный негатив</option>
+            </select>
+          </div>
+
+          <div id="specificNegGroup" style="display: none;" class="stat-row">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="negStatSelect">Характеристика негатива</label>
+              <select id="negStatSelect"></select>
+            </div>
+            <div class="grid-2">
+              <input type="number" id="negMinInput" placeholder="Мин %" step="0.1">
+              <input type="number" id="negMaxInput" placeholder="Макс %" step="0.1">
+            </div>
+          </div>
+        </div>
+
+        <!-- Lich / Sister Specific Fields -->
+        <div id="lichSisterSection" style="display: none;">
+          <div class="form-group">
+            <label for="elementSelect">Стихия (Progenitor Element)</label>
+            <select id="elementSelect">
+              <option value="any" selected>Любая стихия</option>
+              <option value="heat">🔥 Heat (Огонь)</option>
+              <option value="toxin">🧪 Toxin (Токсин)</option>
+              <option value="radiation">☢️ Radiation (Радиация)</option>
+              <option value="cold">❄️ Cold (Холод)</option>
+              <option value="electricity">⚡ Electricity (Электричество)</option>
+              <option value="magnetic">🧲 Magnetic (Магнетизм)</option>
+              <option value="impact">💥 Impact (Удар)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="minDamageInput">Мин. Урон (Bonus Damage %)</label>
+            <input type="number" id="minDamageInput" placeholder="25 - 60%" min="25" max="60" step="0.1">
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label for="ephemeraSelect">Эфемера</label>
+              <select id="ephemeraSelect">
+                <option value="any" selected>Любая</option>
+                <option value="yes">✨ Только с эфемерой</option>
+                <option value="no">❌ Без эфемеры</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="quirkSelect">Особенность (Quirk)</label>
+              <select id="quirkSelect">
+                <option value="any" selected>Любая</option>
+                <option value="none">Без особенности (None)</option>
+                <option value="poor_sense_of_balance">Poor Sense of Balance</option>
+                <option value="pyromaniac">Pyromaniac</option>
+                <option value="bloodhound">Bloodhound</option>
+                <option value="fear_of_kubrows">Fear of Kubrows</option>
+                <option value="prone_to_vertigo">Prone to Vertigo</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -131,6 +188,6 @@
 
   <div class="toast" id="toastMessage">Сохранено</div>
 
-  <script src="/app.js?v=7"></script>
+  <script src="/app.js?v=9"></script>
 </body>
 </html>

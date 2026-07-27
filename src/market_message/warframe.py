@@ -56,24 +56,140 @@ FALLBACK_RIVEN_ATTRIBUTES: list[RivenAttribute] = [
     RivenAttribute(url_name="critical_chance_on_slide_attack", effect="Critical Chance for Slide Attack", positive_is_negative=False),
 ]
 
+WEAPON_RU_NAMES: dict[str, str] = {
+    "rubico": "Рубико",
+    "torid": "Торид",
+    "glaive": "Глефа",
+    "burston": "Берстон",
+    "latron": "Летрон",
+    "lex": "Лекс",
+    "strun": "Струн",
+    "nataruk": "Натарук",
+    "stropha": "Строфа",
+    "kronen": "Кронен",
+    "kuva_bramma": "Кува Брамма",
+    "kuva_zarr": "Кува Зарр",
+    "felarx": "Феларкс",
+    "phenmor": "Фенмор",
+    "laetum": "Лэтум",
+    "cerata": "Церата",
+    "nikana": "Никана",
+    "acceltra": "Акцелтра",
+    "ignis": "Игнис",
+    "soma": "Сома",
+    "vectis": "Вектис",
+    "orthos": "Ортос",
+    "gram": "Грам",
+    "sporahtrix": "Споратрикс",
+    "trumna": "Трумна",
+    "cedo": "Цедо",
+    "epitaph": "Эпитафия",
+    "ocucor": "Окукор",
+    "synapse": "Синапс",
+    "amprex": "Ампрекс",
+    "lanka": "Ланка",
+    "kuva_nukor": "Кува Нукор",
+    "tenet_arca_plasmor": "Тенет Арка Плазмор",
+    "tenet_envoy": "Тенет Посланник",
+    "corvas": "Корвас",
+    "pyana": "Пьяна",
+    "bo": "Бо",
+    "karyst": "Карист",
+    "skana": "Скана",
+    "redeemer": "Искупитель",
+    "guandao": "Гуаньдао",
+    "reaper_prime": "Жнец Прайм",
+    "tipedo": "Типедо",
+    "cestra": "Цестра",
+    "furis": "Фурис",
+    "vasto": "Васто",
+    "magnus": "Магнус",
+    "aklex": "Аклекс",
+    "akbolto": "Акболто",
+    "boltor": "Болтор",
+    "grakata": "Граката",
+    "karak": "Карак",
+    "gorgon": "Горгон",
+    "dera": "Дера",
+    "supra": "Супра",
+    "cinta": "Синта",
+    "dread": "Страх",
+    "paris": "Парис",
+    "cernos": "Чернос",
+    "daikyu": "Дайкю",
+    "zarr": "Зарр",
+    "tonkor": "Тонкор",
+    "ogris": "Огрис",
+    "penta": "Пента",
+    "opticor": "Оптикор",
+    "lenz": "Ленз",
+    "tigris": "Тигрис",
+    "boar": "Боар",
+    "hek": "Хек",
+    "sobek": "Собек",
+    "kohm": "Хом",
+    "exergis": "Экзергис",
+    "arca_plasmor": "Арка Плазмор",
+    "fulmin": "Фульмин",
+    "baza": "База",
+    "sybaris": "Сибарис",
+    "chakkhurr": "Чаккхур",
+    "stalta": "Стальта",
+    "quellor": "Квеллор",
+    "gotva_prime": "Готва Прайм",
+    "bubonico": "Бубонико",
+    "kompressa": "Компресса",
+    "knell": "Кнелл",
+    "pyranha": "Пиранья",
+    "cycron": "Цикрон",
+    "plinx": "Плинкс",
+    "catchmoon": "Ловец Лун",
+    "tombfinger": "Гробопалец",
+    "rattlegut": "Грохотун",
+    "sporelacer": "Спорострел",
+    "gaze": "Взгляд",
+}
+
 FALLBACK_RIVEN_ITEMS: list[RivenItem] = [
-    RivenItem(url_name="rubico", item_name="Rubico", group="primary", riven_type="sniper"),
-    RivenItem(url_name="torid", item_name="Torid", group="primary", riven_type="rifle"),
-    RivenItem(url_name="glaive", item_name="Glaive", group="melee", riven_type="melee"),
-    RivenItem(url_name="burston", item_name="Burston", group="primary", riven_type="rifle"),
-    RivenItem(url_name="latron", item_name="Latron", group="primary", riven_type="rifle"),
-    RivenItem(url_name="lex", item_name="Lex", group="secondary", riven_type="pistol"),
-    RivenItem(url_name="strun", item_name="Strun", group="primary", riven_type="shotgun"),
-    RivenItem(url_name="nataruk", item_name="Nataruk", group="primary", riven_type="bow"),
-    RivenItem(url_name="stropha", item_name="Stropha", group="melee", riven_type="melee"),
-    RivenItem(url_name="kronen", item_name="Kronen", group="melee", riven_type="melee"),
-    RivenItem(url_name="kuva_bramma", item_name="Kuva Bramma", group="primary", riven_type="bow"),
-    RivenItem(url_name="kuva_zarr", item_name="Kuva Zarr", group="primary", riven_type="shotgun"),
-    RivenItem(url_name="felarx", item_name="Felarx", group="primary", riven_type="shotgun"),
-    RivenItem(url_name="phenmor", item_name="Phenmor", group="primary", riven_type="rifle"),
-    RivenItem(url_name="laetum", item_name="Laetum", group="secondary", riven_type="pistol"),
-    RivenItem(url_name="cerata", item_name="Cerata", group="melee", riven_type="melee"),
-    RivenItem(url_name="nikana", item_name="Nikana", group="melee", riven_type="melee"),
+    RivenItem(url_name="rubico", item_name="Rubico", group="primary", riven_type="sniper", ru_name="Рубико"),
+    RivenItem(url_name="torid", item_name="Torid", group="primary", riven_type="rifle", ru_name="Торид"),
+    RivenItem(url_name="glaive", item_name="Glaive", group="melee", riven_type="melee", ru_name="Глефа"),
+    RivenItem(url_name="burston", item_name="Burston", group="primary", riven_type="rifle", ru_name="Берстон"),
+    RivenItem(url_name="latron", item_name="Latron", group="primary", riven_type="rifle", ru_name="Летрон"),
+    RivenItem(url_name="lex", item_name="Lex", group="secondary", riven_type="pistol", ru_name="Лекс"),
+    RivenItem(url_name="strun", item_name="Strun", group="primary", riven_type="shotgun", ru_name="Струн"),
+    RivenItem(url_name="nataruk", item_name="Nataruk", group="primary", riven_type="bow", ru_name="Натарук"),
+    RivenItem(url_name="stropha", item_name="Stropha", group="melee", riven_type="melee", ru_name="Строфа"),
+    RivenItem(url_name="kronen", item_name="Kronen", group="melee", riven_type="melee", ru_name="Кронен"),
+    RivenItem(url_name="kuva_bramma", item_name="Kuva Bramma", group="primary", riven_type="bow", ru_name="Кува Брамма"),
+    RivenItem(url_name="kuva_zarr", item_name="Kuva Zarr", group="primary", riven_type="shotgun", ru_name="Кува Зарр"),
+    RivenItem(url_name="felarx", item_name="Felarx", group="primary", riven_type="shotgun", ru_name="Феларкс"),
+    RivenItem(url_name="phenmor", item_name="Phenmor", group="primary", riven_type="rifle", ru_name="Фенмор"),
+    RivenItem(url_name="laetum", item_name="Laetum", group="secondary", riven_type="pistol", ru_name="Лэтум"),
+    RivenItem(url_name="cerata", item_name="Cerata", group="melee", riven_type="melee", ru_name="Церата"),
+    RivenItem(url_name="nikana", item_name="Nikana", group="melee", riven_type="melee", ru_name="Никана"),
+]
+
+FALLBACK_LICH_ITEMS: list[RivenItem] = [
+    RivenItem(url_name="kuva_zarr", item_name="Kuva Zarr", group="primary", ru_name="Кува Зарр"),
+    RivenItem(url_name="kuva_bramma", item_name="Kuva Bramma", group="primary", ru_name="Кува Брамма"),
+    RivenItem(url_name="kuva_nukor", item_name="Kuva Nukor", group="secondary", ru_name="Кува Нукор"),
+    RivenItem(url_name="kuva_chakkhurr", item_name="Kuva Chakkhurr", group="primary", ru_name="Кува Чаккхур"),
+    RivenItem(url_name="kuva_hek", item_name="Kuva Hek", group="primary", ru_name="Кува Хек"),
+    RivenItem(url_name="kuva_shildeg", item_name="Kuva Shildeg", group="melee", ru_name="Кува Шилдег"),
+    RivenItem(url_name="kuva_tonkor", item_name="Kuva Tonkor", group="primary", ru_name="Кува Тонкор"),
+    RivenItem(url_name="kuva_ogris", item_name="Kuva Ogris", group="primary", ru_name="Кува Огрис"),
+    RivenItem(url_name="kuva_drakgoon", item_name="Kuva Drakgoon", group="primary", ru_name="Кува Дракгун"),
+]
+
+FALLBACK_SISTER_ITEMS: list[RivenItem] = [
+    RivenItem(url_name="tenet_arca_plasmor", item_name="Tenet Arca Plasmor", group="primary", ru_name="Тенет Арка Плазмор"),
+    RivenItem(url_name="tenet_envoy", item_name="Tenet Envoy", group="primary", ru_name="Тенет Посланник"),
+    RivenItem(url_name="tenet_cycron", item_name="Tenet Cycron", group="secondary", ru_name="Тенет Цикрон"),
+    RivenItem(url_name="tenet_exec", item_name="Tenet Exec", group="melee", ru_name="Тенет Экзек"),
+    RivenItem(url_name="tenet_plinx", item_name="Tenet Plinx", group="secondary", ru_name="Тенет Плинкс"),
+    RivenItem(url_name="tenet_diplos", item_name="Tenet Diplos", group="secondary", ru_name="Тенет Диплос"),
+    RivenItem(url_name="tenet_spirex", item_name="Tenet Spirex", group="secondary", ru_name="Тенет Спайрекс"),
 ]
 
 
@@ -148,6 +264,33 @@ class WarframeMarketClient:
         logger.info("Using fallback static riven items list")
         return FALLBACK_RIVEN_ITEMS
 
+    def get_lich_weapons(self) -> list[RivenItem]:
+        try:
+            data = self._request("GET", "/v2/lich/weapons")
+            items = extract_riven_items(data)
+            if items:
+                return items
+        except Exception as exc:
+            logger.warning("Failed to fetch lich weapons from v2 API: %s", exc)
+        return FALLBACK_LICH_ITEMS
+
+    def get_sister_weapons(self) -> list[RivenItem]:
+        try:
+            data = self._request("GET", "/v2/sister/weapons")
+            items = extract_riven_items(data)
+            if items:
+                return items
+        except Exception as exc:
+            logger.warning("Failed to fetch sister weapons from v2 API: %s", exc)
+        return FALLBACK_SISTER_ITEMS
+
+    def get_items_by_type(self, type_: str = "riven") -> list[RivenItem]:
+        if type_ in ("kuva_lich", "lich"):
+            return self.get_lich_weapons()
+        if type_ in ("sister_of_parvos", "sister"):
+            return self.get_sister_weapons()
+        return self.get_riven_items()
+
     def get_riven_attributes(self) -> list[RivenAttribute]:
         try:
             data = self._request("GET", "/v2/riven/attributes")
@@ -174,17 +317,27 @@ class WarframeMarketClient:
         weapon_url_name: str | None = None,
         positive_stats: str | list[str] | None = None,
         sort_by: str | None = None,
+        element: str | None = None,
+        having_ephemera: bool | None = None,
+        quirk: str | None = None,
     ) -> list[AuctionItem]:
-        path = f"/auctions/search?type={type_}"
+        api_type = "lich" if type_ in ("kuva_lich", "lich") else ("sister" if type_ in ("sister_of_parvos", "sister") else "riven")
+        path = f"/auctions/search?type={api_type}"
         if weapon_url_name and weapon_url_name != "*":
             path += f"&weapon_url_name={weapon_url_name}"
-        if positive_stats:
+        if positive_stats and api_type == "riven":
             if isinstance(positive_stats, (list, tuple, set)):
                 stats_str = ",".join(positive_stats)
             else:
                 stats_str = str(positive_stats)
             if stats_str:
                 path += f"&positive_stats={stats_str}"
+        if element and element != "any":
+            path += f"&element={element}"
+        if having_ephemera is not None:
+            path += f"&having_ephemera={'true' if having_ephemera else 'false'}"
+        if quirk and quirk not in ("any", "none"):
+            path += f"&quirk={quirk}"
         if sort_by:
             path += f"&sort_by={sort_by}"
         data = self._request("GET", path)
@@ -522,6 +675,14 @@ def extract_riven_items(data: dict[str, Any]) -> list[RivenItem]:
             continue
         riven_type = _optional_str(item.get("riven_type") or item.get("rivenType"))
         icon = _optional_str(item.get("icon") or _extract_i18n_icon(item.get("i18n")))
+
+        ru_name = None
+        i18n = item.get("i18n")
+        if isinstance(i18n, dict) and isinstance(i18n.get("ru"), dict) and i18n["ru"].get("name"):
+            ru_name = str(i18n["ru"]["name"])
+        if not ru_name:
+            ru_name = WEAPON_RU_NAMES.get(str(url_name))
+
         result.append(
             RivenItem(
                 url_name=str(url_name),
@@ -529,6 +690,7 @@ def extract_riven_items(data: dict[str, Any]) -> list[RivenItem]:
                 group=str(item.get("group", "primary")),
                 riven_type=riven_type,
                 icon=icon,
+                ru_name=ru_name,
             )
         )
     return result
@@ -583,6 +745,12 @@ def extract_auctions(data: dict[str, Any]) -> list[AuctionItem]:
 
         weapon_url_name = item_dict.get("weapon_url_name") or item_dict.get("url_name") or "*"
         riven_name = item_dict.get("name") or item_dict.get("riven_name") or weapon_url_name
+        item_type = str(item_dict.get("type") or "riven")
+        element = _optional_str(item_dict.get("element"))
+        damage = item_dict.get("damage")
+        having_ephemera = bool(item_dict.get("having_ephemera", False))
+        ephemera = _optional_str(item_dict.get("ephemera"))
+        quirk = _optional_str(item_dict.get("quirk"))
         
         attributes_raw = item_dict.get("attributes") or []
         parsed_attrs: list[AuctionAttribute] = []
@@ -627,6 +795,12 @@ def extract_auctions(data: dict[str, Any]) -> list[AuctionItem]:
                 is_direct_sell=bool(auction.get("is_direct_sell", True)),
                 created_at=_optional_str(auction.get("created")),
                 updated_at=_optional_str(auction.get("updated")),
+                item_type=item_type,
+                element=element,
+                damage=float(damage) if damage is not None else None,
+                having_ephemera=having_ephemera,
+                ephemera=ephemera,
+                quirk=quirk,
             )
         )
 

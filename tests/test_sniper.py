@@ -430,6 +430,101 @@ def test_sniper_wildcard_weapon_disabled(tmp_path):
     assert len(calls) == 0
 
 
+def test_matches_rule_lich_sister():
+    lich_rule = SniperRule(
+        name="Kuva Zarr Heat",
+        item_type="kuva_lich",
+        weapon_url_name="kuva_zarr",
+        element="heat",
+        min_damage=50.0,
+        ephemera_filter="yes",
+        quirk="none",
+        is_active=True,
+    )
+
+    matching_lich = AuctionItem(
+        id="lich_1",
+        item_type="kuva_lich",
+        weapon_url_name="kuva_zarr",
+        element="heat",
+        damage=55.5,
+        having_ephemera=True,
+        quirk="none",
+        buyout_price=300,
+        seller_name="LichHunter",
+        seller_status="ingame",
+    )
+
+    failing_lich_element = AuctionItem(
+        id="lich_2",
+        item_type="kuva_lich",
+        weapon_url_name="kuva_zarr",
+        element="toxin",
+        damage=55.5,
+        having_ephemera=True,
+        quirk="none",
+        buyout_price=300,
+        seller_name="LichHunter",
+        seller_status="ingame",
+    )
+
+    failing_lich_damage = AuctionItem(
+        id="lich_3",
+        item_type="kuva_lich",
+        weapon_url_name="kuva_zarr",
+        element="heat",
+        damage=45.0,
+        having_ephemera=True,
+        quirk="none",
+        buyout_price=300,
+        seller_name="LichHunter",
+        seller_status="ingame",
+    )
+
+    failing_lich_ephemera = AuctionItem(
+        id="lich_4",
+        item_type="kuva_lich",
+        weapon_url_name="kuva_zarr",
+        element="heat",
+        damage=55.5,
+        having_ephemera=False,
+        quirk="none",
+        buyout_price=300,
+        seller_name="LichHunter",
+        seller_status="ingame",
+    )
+
+    assert matches_rule(lich_rule, matching_lich) is True
+    assert matches_rule(lich_rule, failing_lich_element) is False
+    assert matches_rule(lich_rule, failing_lich_damage) is False
+    assert matches_rule(lich_rule, failing_lich_ephemera) is False
+
+
+def test_format_lich_sister_notification():
+    rule = SniperRule(name="Tenet Envoy Cold", item_type="sister_of_parvos", weapon_url_name="tenet_envoy")
+    auction = AuctionItem(
+        id="sister_123",
+        item_type="sister_of_parvos",
+        weapon_url_name="tenet_envoy",
+        element="cold",
+        damage=60.0,
+        having_ephemera=True,
+        quirk="pyromaniac",
+        buyout_price=400,
+        seller_name="SisterHunter",
+        seller_status="ingame",
+    )
+
+    html = format_riven_notification(auction, rule, "https://warframe.market")
+    assert "Сестра Парвоса" in html
+    assert "Tenet Envoy" in html
+    assert "Cold (60.0%)" in html
+    assert "Да ✨" in html
+    assert "Pyromaniac" in html
+    assert "/w SisterHunter Hi! WTB your [Tenet Envoy] (Cold 60.0%) for 400p" in html
+
+
+
 
 
 

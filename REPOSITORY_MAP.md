@@ -1,7 +1,7 @@
 # Repository Map
 
 ## Назначение
-Сервис для автоматического отслеживания входящих сообщений Warframe Market, а также снайпинга лотов (Riven-модов, обычных модов, лицензиатов Кува/Сестер) с уведомлениями в Telegram и управлением через Telegram Mini App.
+Сервис для автоматического отслеживания входящих сообщений Warframe Market, а также снайпинга лотов (Riven-модов, Кува Личей, Сестер Парвоса) с уведомлениями в Telegram и управлением через Telegram Mini App.
 
 ## Архитектура и компоненты
 
@@ -11,27 +11,28 @@
   - `Точки входа`: `Config.from_env()`
   - `Контракты`: Задает таймауты, интервалы опроса, токены Telegram, учетные данные Warframe Market, `web_app_secret_token`, `WARFRAME_MARKET_MAX_RPS` и `WARFRAME_MARKET_MAX_RPM`.
 - **`models.py`**
-  - `Назначение`: Структуры данных (dataclass) для сообщений, чатов, аукционов и правил снайпера.
-  - `Точки входа`: `ChatMessage`, `AuctionItem`, `SniperRule`
+  - `Назначение`: Структуры данных (dataclass) для сообщений, чатов, аукционов (Riven / Lich / Sister) и правил снайпера.
+  - `Точки входа`: `ChatMessage`, `AuctionItem`, `SniperRule`, `RivenItem`
+  - `Контракты`: Поддержка специфичных полей для Личей и Сестер (`item_type`, `element`, `damage`, `having_ephemera`, `ephemera`, `quirk`, `min_damage`, `ephemera_filter`).
 - **`state.py`**
   - `Назначение`: SQLite-хранилище обработанных сообщений, просмотренных аукционов и правил снайпинга.
   - `Точки входа`: `StateStore`
   - `Контракты`: Инициализация таблиц, фиксация последней цены лота (`last_price`), повторная проверка при изменении цены, очистка неактивных лотов старше N дней (`cleanup_old_seen_auctions`).
 - **`warframe.py`**
-  - `Назначение`: Клиент для работы с REST API и WebSocket Warframe Market (аутентификация, чаты, аукционы, справочники Riven v1/v2 и фолбэк-списки).
-  - `Точки входа`: `WarframeMarketClient`, `extract_riven_items`, `extract_riven_attributes`, `FALLBACK_RIVEN_ITEMS`, `FALLBACK_RIVEN_ATTRIBUTES`
-  - `Контракты`: Использование токенов сессий, поддержка v2 API (`/v2/riven/weapons`, `/v2/riven/attributes`), скользящее ограничение частоты запросов (rate limit <= 3 RPS и <= 10 RPM), автоматический retry при HTTP 429, статическая страховка при сбоях API, обработка ошибок авторизации, поиск аукционов по оружию, фильтрам характеристик (`positive_stats`) и сортировке.
+  - `Назначение`: Клиент для работы с REST API и WebSocket Warframe Market (аутентификация, чаты, аукционы Riven/Lich/Sister, русские названия и фолбэк-списки).
+  - `Точки входа`: `WarframeMarketClient`, `get_lich_weapons`, `get_sister_weapons`, `get_items_by_type`, `extract_riven_items`, `extract_riven_attributes`, `FALLBACK_RIVEN_ITEMS`, `FALLBACK_LICH_ITEMS`, `FALLBACK_SISTER_ITEMS`, `WEAPON_RU_NAMES`
+  - `Контракты`: Использование токенов сессий, поддержка v2 API (`/v2/riven/weapons`, `/v2/lich/weapons`, `/v2/sister/weapons`), скользящее ограничение частоты запросов (rate limit <= 3 RPS и <= 10 RPM), автоматический retry при HTTP 429, статическая страховка при сбоях API, поддержка русских названий оружия (`ru_name` / `WEAPON_RU_NAMES`), поиск аукционов по оружию, типу (`riven`, `lich`, `sister`) и специфичным фильтрам.
 - **`telegram.py`**
   - `Назначение`: Клиент Telegram Bot API для отправки уведомлений, обработки reply, вызова Telegram Mini App и валидации `initData`.
   - `Точки входа`: `TelegramClient`, `validate_init_data`, `extract_user_from_init_data`
 - **`sniper.py`**
-  - `Назначение`: Движок фильтрации и снайпинга лотов по правилам пользователя.
-  - `Точки входа`: `RivenSniperEngine`
-  - `Контракты`: Ограничение отправки уведомлений за один проход по широким правилам (`MAX_ALERTS_PER_RULE_RUN`), отслеживание снижения цен на ранее найденных лотах, автоматическая очистка устаревших лотов (`SEEN_AUCTION_TTL_DAYS`), сводная сводка в Telegram для защиты от спама, полное отключение поиска по "любому оружию" (`*`) для предотвращения исчерпания API rate limit (429 Too Many Requests).
+  - `Назначение`: Движок фильтрации и снайпинга лотов (Riven, Кува Личей, Сестер Парвоса) по правилам пользователя.
+  - `Точки входа`: `RivenSniperEngine`, `matches_rule`, `format_riven_notification`
+  - `Контракты`: Ограничение отправки уведомлений за один проход по широким правилам (`MAX_ALERTS_PER_RULE_RUN`), отслеживание снижения цен на ранее найденных лотах, автоматическая очистка устаревших лотов (`SEEN_AUCTION_TTL_DAYS`), специализированное форматирование Telegram-уведомлений для Riven и Lich/Sister, полное отключение поиска по "любому оружию" (`*`) для предотвращения исчерпания API rate limit (429 Too Many Requests).
 - **`web.py`**
   - `Назначение`: HTTP-сервер для обработки запросов Telegram Mini App и отдачи статики.
-  - `Точки входа`: `run_web_server()`, `WebServer.handle_index`, `WebServer._validate_request_auth`
-  - `Контракты`: Строгая авторизация всех API эндпоинтов по подписи `initData` Telegram с проверкой `user.id == TELEGRAM_CHAT_ID` или по `WEB_APP_SECRET_TOKEN`, валидация правил с отклонением создания/изменения правил с невыбранным или 'любым' оружием (`*`), отдача `index.html` по умолчанию для `/` (без листинга файлов директории).
+  - `Точки входа`: `run_web_server()`, `WebServer.handle_index`, `WebServer.handle_riven_meta`, `WebServer._validate_request_auth`
+  - `Контракты`: Строгая авторизация всех API эндпоинтов по подписи `initData` Telegram с проверкой `user.id == TELEGRAM_CHAT_ID` или по `WEB_APP_SECRET_TOKEN`, отдаче метаданных по типу `?type=riven|kuva_lich|sister_of_parvos`, валидация правил с отклонением создания/изменения правил с невыбранным или 'любым' оружием (`*`), отдача `index.html` по умолчанию для `/`.
 - **`forwarder.py`**
   - `Назначение`: Связующая логика между Warframe Market и Telegram для пересылки входящих сообщений.
   - `Точки входа`: `MessageForwarder`
@@ -43,11 +44,10 @@
 - **`static/`**
   - `Назначение`: Фронтенд Telegram Mini App (HTML, CSS, JS, Service Worker).
   - `Точки входа`: `app/web/static/index.html`, `app/web/static/app.js`, `app/web/static/style.css`, `app/web/static/service-worker.js`
-  - `Контракты`: Поддержка тёмного интерфейса TMA, валидация формы, кастомные дропдауны с текстовым поиском по названию оружия/характеристик (`SearchableSelect`), управление версией SW (`const SW_VERSION = "..."`).
+  - `Контракты`: Поддержка тёмного интерфейса TMA, выбор типа правила (`riven`, `kuva_lich`, `sister_of_parvos`), динамическое переключение формы (скрытие Riven-полей и показ фильтров стихии, урона, эфемеры, причуд), кастомные дропдауны с текстовым поиском по английскому и русскому названию оружия/характеристик (`SearchableSelect`), управление версией SW (`const SW_VERSION = "..."`).
 
 ### `ВАЖНОЕ ЗАМЕЧАНИЕ`
-при изменении фронтенда (app/web) необходимо инкрементировать версию в index.html 
-
+при изменении фронтенда (app/web) необходимо инкрементировать версию в index.html и service-worker.js
 
 ### `docs/`
 - **`deployment.md`**
@@ -55,6 +55,7 @@
   - `Точки входа`: `docs/deployment.md`
 
 ### `tests/`
-- `Назначение`: Юнит- и интеграционные тесты логики снайпинга, граничных условий, TDD-сценариев, веб-сервера, хранилища и форматирования.
+- `Назначение`: Юнит- и интеграционные тесты логики снайпинга Riven/Lich/Sister, граничных условий, TDD-сценариев, веб-сервера, хранилища и форматирования.
 - `Точки входа`: `pytest`
+
 

@@ -15,6 +15,11 @@ def matches_rule(rule: SniperRule, auction: AuctionItem) -> bool:
     if not rule.is_active:
         return False
 
+    rule_type = "lich" if rule.item_type in ("kuva_lich", "lich") else ("sister" if rule.item_type in ("sister_of_parvos", "sister") else "riven")
+    auction_type = "lich" if auction.item_type in ("kuva_lich", "lich") else ("sister" if auction.item_type in ("sister_of_parvos", "sister") else "riven")
+    if rule_type != auction_type:
+        return False
+
     # 1. Weapon check
     if rule.weapon_url_name and rule.weapon_url_name != "*":
         if rule.weapon_url_name.lower() != auction.weapon_url_name.lower():
@@ -31,61 +36,83 @@ def matches_rule(rule: SniperRule, auction: AuctionItem) -> bool:
         if rule.max_price is not None and price > rule.max_price:
             return False
 
-    # 3. Rerolls check
-    if rule.min_rerolls is not None and auction.rerolls < rule.min_rerolls:
-        return False
-    if rule.max_rerolls is not None and auction.rerolls > rule.max_rerolls:
-        return False
-
-    # 4. Seller status check
+    # 3. Seller status check
     if rule.seller_status == "ingame" and auction.seller_status != "ingame":
         return False
     if rule.seller_status == "online" and auction.seller_status not in {"ingame", "online"}:
         return False
 
-    # 5. Positive stats check
-    pos_attrs = {attr.url_name: attr.value for attr in auction.attributes if attr.positive}
-    for req in rule.positive_stats:
-        url_name = req.get("url_name")
-        if not url_name:
-            continue
-        if url_name not in pos_attrs:
+    if rule_type == "riven":
+        # 4. Rerolls check
+        if rule.min_rerolls is not None and auction.rerolls < rule.min_rerolls:
             return False
-        val = pos_attrs[url_name]
-        min_val = req.get("min_value")
-        max_val = req.get("max_value")
-        if min_val is not None and val < float(min_val):
-            return False
-        if max_val is not None and val > float(max_val):
+        if rule.max_rerolls is not None and auction.rerolls > rule.max_rerolls:
             return False
 
-    # 6. Negative stat check
-    neg_attrs = [attr for attr in auction.attributes if not attr.positive]
-    neg_rule = rule.negative_stat or {}
-    mode = neg_rule.get("mode", "any_or_none")  # "none", "any", "specific", "any_or_none"
+        # 5. Positive stats check
+        pos_attrs = {attr.url_name: attr.value for attr in auction.attributes if attr.positive}
+        for req in rule.positive_stats:
+            url_name = req.get("url_name")
+            if not url_name:
+                continue
+            if url_name not in pos_attrs:
+                return False
+            val = pos_attrs[url_name]
+            min_val = req.get("min_value")
+            max_val = req.get("max_value")
+            if min_val is not None and val < float(min_val):
+                return False
+            if max_val is not None and val > float(max_val):
+                return False
 
-    if mode == "none":
-        if len(neg_attrs) > 0:
+        # 6. Negative stat check
+        neg_attrs = [attr for attr in auction.attributes if not attr.positive]
+        neg_rule = rule.negative_stat or {}
+        mode = neg_rule.get("mode", "any_or_none")
+
+        if mode == "none":
+            if len(neg_attrs) > 0:
+                return False
+        elif mode == "any":
+            if len(neg_attrs) == 0:
+                return False
+        elif mode == "specific":
+            target_url = neg_rule.get("url_name")
+            if not target_url:
+                return False
+            matching = [a for a in neg_attrs if a.url_name == target_url]
+            if not matching:
+                return False
+            val = matching[0].value
+            min_val = neg_rule.get("min_value")
+            max_val = neg_rule.get("max_value")
+            abs_val = abs(val)
+            if min_val is not None and abs_val < abs(float(min_val)):
+                return False
+            if max_val is not None and abs_val > abs(float(max_val)):
+                return False
+    else:
+        # Lich / Sister checks
+        if rule.element and rule.element not in ("any", "*"):
+            if not auction.element or auction.element.lower() != rule.element.lower():
+                return False
+
+        if rule.min_damage is not None:
+            if auction.damage is None or auction.damage < float(rule.min_damage):
+                return False
+
+        if rule.ephemera_filter == "yes" and not auction.having_ephemera:
             return False
-    elif mode == "any":
-        if len(neg_attrs) == 0:
+        if rule.ephemera_filter == "no" and auction.having_ephemera:
             return False
-    elif mode == "specific":
-        target_url = neg_rule.get("url_name")
-        if not target_url:
-            return False
-        matching = [a for a in neg_attrs if a.url_name == target_url]
-        if not matching:
-            return False
-        val = matching[0].value
-        min_val = neg_rule.get("min_value")
-        max_val = neg_rule.get("max_value")
-        # Handle magnitude comparison if stats are negative floats (e.g. -45.0)
-        abs_val = abs(val)
-        if min_val is not None and abs_val < abs(float(min_val)):
-            return False
-        if max_val is not None and abs_val > abs(float(max_val)):
-            return False
+
+        if rule.quirk and rule.quirk not in ("any", "*"):
+            if rule.quirk == "none":
+                if auction.quirk and auction.quirk not in ("none", ""):
+                    return False
+            else:
+                if not auction.quirk or auction.quirk.lower() != rule.quirk.lower():
+                    return False
 
     return True
 
@@ -93,6 +120,17 @@ def matches_rule(rule: SniperRule, auction: AuctionItem) -> bool:
 def format_stat_name(url_name: str) -> str:
     clean = url_name.replace("_", " ").title()
     return clean
+
+
+ELEMENT_EMOJIS = {
+    "heat": "🔥",
+    "toxin": "🧪",
+    "cold": "❄️",
+    "electricity": "⚡",
+    "magnetic": "🧲",
+    "radiation": "☢️",
+    "impact": "💥",
+}
 
 
 def format_riven_notification(
@@ -111,32 +149,60 @@ def format_riven_notification(
         price_str = "Н/Д"
 
     status_emoji = "🟢" if auction.seller_status == "ingame" else ("🟡" if auction.seller_status == "online" else "⚪")
-    header_title = "📉 <b>СНАЙПЕР: Снижение цены на Riven!</b>" if (old_price is not None and current_price is not None and old_price > current_price) else "🎯 <b>СНАЙПЕР: Найден Riven!</b>"
-
-    attr_lines = []
-    for attr in auction.attributes:
-        sign = "+" if attr.positive else "-"
-        val_str = f"{abs(attr.value):.1f}"
-        name = format_stat_name(attr.url_name)
-        emoji = "✨" if attr.positive else "🔻"
-        attr_lines.append(f"{emoji} <code>{sign}{val_str}% {name}</code>")
-
-    stats_block = "\n".join(attr_lines) if attr_lines else "<i>Нет характеристик</i>"
-    whisper_cmd = f"/w {auction.seller_name} Hi! WTB your [{auction.riven_name}] for {auction.buyout_price or auction.starting_price or 0}p (warframe.market)"
     auction_url = f"{market_base_url}/auction/{auction.id}"
 
-    return (
-        f"{header_title}\n"
-        f"📋 <b>Правило</b>: <i>{_escape_html(rule.name)}</i>\n\n"
-        f"🔫 <b>Оружие</b>: <b>{_escape_html(auction.riven_name.title())}</b>\n"
-        f"💰 <b>Цена</b>: <b>{price_str}</b>\n"
-        f"👤 <b>Продавец</b>: {status_emoji} <b>{_escape_html(auction.seller_name)}</b> ({auction.seller_status})\n"
-        f"🔄 <b>Роллы</b>: {auction.rerolls} | <b>MR</b>: {auction.mastery_rank} | <b>Полярность</b>: {auction.polarity.title()}\n\n"
-        f"📊 <b>Характеристики</b>:\n{stats_block}\n\n"
-        f"💬 <b>Нажми, чтобы скопировать шёпот</b>:\n"
-        f"<pre><code>{_escape_html(whisper_cmd)}</code></pre>\n\n"
-        f"🔗 <a href=\"{auction_url}\">Открыть на Warframe.Market</a>"
-    )
+    rule_type = "lich" if rule.item_type in ("kuva_lich", "lich") else ("sister" if rule.item_type in ("sister_of_parvos", "sister") else "riven")
+
+    if rule_type == "riven":
+        header_title = "📉 <b>СНАЙПЕР: Снижение цены на Riven!</b>" if (old_price is not None and current_price is not None and old_price > current_price) else "🎯 <b>СНАЙПЕР: Найден Riven!</b>"
+        attr_lines = []
+        for attr in auction.attributes:
+            sign = "+" if attr.positive else "-"
+            val_str = f"{abs(attr.value):.1f}"
+            name = format_stat_name(attr.url_name)
+            emoji = "✨" if attr.positive else "🔻"
+            attr_lines.append(f"{emoji} <code>{sign}{val_str}% {name}</code>")
+
+        stats_block = "\n".join(attr_lines) if attr_lines else "<i>Нет характеристик</i>"
+        whisper_cmd = f"/w {auction.seller_name} Hi! WTB your [{auction.riven_name}] for {auction.buyout_price or auction.starting_price or 0}p (warframe.market)"
+
+        return (
+            f"{header_title}\n"
+            f"📋 <b>Правило</b>: <i>{_escape_html(rule.name)}</i>\n\n"
+            f"🔫 <b>Оружие</b>: <b>{_escape_html(auction.riven_name.title())}</b>\n"
+            f"💰 <b>Цена</b>: <b>{price_str}</b>\n"
+            f"👤 <b>Продавец</b>: {status_emoji} <b>{_escape_html(auction.seller_name)}</b> ({auction.seller_status})\n"
+            f"🔄 <b>Роллы</b>: {auction.rerolls} | <b>MR</b>: {auction.mastery_rank} | <b>Полярность</b>: {auction.polarity.title()}\n\n"
+            f"📊 <b>Характеристики</b>:\n{stats_block}\n\n"
+            f"💬 <b>Нажми, чтобы скопировать шёпот</b>:\n"
+            f"<pre><code>{_escape_html(whisper_cmd)}</code></pre>\n\n"
+            f"🔗 <a href=\"{auction_url}\">Открыть на Warframe.Market</a>"
+        )
+    else:
+        type_title = "Кува Лич" if rule_type == "lich" else "Сестра Парвоса"
+        header_title = f"📉 <b>СНАЙПЕР: Снижение цены ({type_title})!</b>" if (old_price is not None and current_price is not None and old_price > current_price) else f"🎯 <b>СНАЙПЕР: Найден {type_title}!</b>"
+        weapon_display = auction.weapon_url_name.replace("_", " ").title()
+        elem_name = (auction.element or "Неизвестно").title()
+        elem_emoji = ELEMENT_EMOJIS.get(str(auction.element).lower(), "⚡")
+        damage_str = f"{auction.damage:.1f}%" if auction.damage is not None else "Н/Д"
+        eph_str = "Да ✨" if auction.having_ephemera else "Нет ❌"
+        quirk_str = auction.quirk.replace("_", " ").title() if auction.quirk and auction.quirk != "none" else "Отсутствует"
+
+        whisper_cmd = f"/w {auction.seller_name} Hi! WTB your [{weapon_display}] ({elem_name} {damage_str}) for {auction.buyout_price or auction.starting_price or 0}p (warframe.market)"
+
+        return (
+            f"{header_title}\n"
+            f"📋 <b>Правило</b>: <i>{_escape_html(rule.name)}</i>\n\n"
+            f"🔫 <b>Оружие</b>: <b>{_escape_html(weapon_display)}</b>\n"
+            f"⚡ <b>Стихия</b>: {elem_emoji} <b>{elem_name} ({damage_str})</b>\n"
+            f"✨ <b>Эфемера</b>: <b>{eph_str}</b>\n"
+            f"🎭 <b>Особенность (Quirk)</b>: {quirk_str}\n"
+            f"💰 <b>Цена</b>: <b>{price_str}</b>\n"
+            f"👤 <b>Продавец</b>: {status_emoji} <b>{_escape_html(auction.seller_name)}</b> ({auction.seller_status})\n\n"
+            f"💬 <b>Нажми, чтобы скопировать шёпот</b>:\n"
+            f"<pre><code>{_escape_html(whisper_cmd)}</code></pre>\n\n"
+            f"🔗 <a href=\"{auction_url}\">Открыть на Warframe.Market</a>"
+        )
 
 
 def _escape_html(text: str) -> str:
@@ -174,26 +240,27 @@ class RivenSniperEngine:
         if not rules:
             return 0
 
-        # Group rules by target weapon url name to minimize API requests
-        weapon_groups: dict[str, list[SniperRule]] = {}
+        # Group rules by (item_type, target weapon url name) to minimize API requests
+        weapon_groups: dict[tuple[str, str], list[SniperRule]] = {}
         for rule in rules:
             w_name = rule.weapon_url_name if rule.weapon_url_name else "*"
-            weapon_groups.setdefault(w_name, []).append(rule)
+            weapon_groups.setdefault((rule.item_type, w_name), []).append(rule)
 
         notified_count = 0
-        for w_name, group_rules in weapon_groups.items():
+        for (item_type, w_name), group_rules in weapon_groups.items():
             if w_name == "*" or not w_name:
                 logger.warning(
-                    "Skipping wildcard weapon ('*') search to prevent Warframe Market API rate limits. Rule names: %s",
+                    "Skipping wildcard weapon ('*') search for %s to prevent Warframe Market API rate limits. Rule names: %s",
+                    item_type,
                     [r.name for r in group_rules],
                 )
                 continue
 
             auctions: list[AuctionItem] = []
             try:
-                auctions = self.warframe.search_auctions(type_="riven", weapon_url_name=w_name)
+                auctions = self.warframe.search_auctions(type_=item_type, weapon_url_name=w_name)
             except Exception as exc:
-                logger.warning("Failed to search riven auctions for weapon '%s': %s", w_name, exc)
+                logger.warning("Failed to search %s auctions for weapon '%s': %s", item_type, w_name, exc)
                 continue
 
             for rule in group_rules:

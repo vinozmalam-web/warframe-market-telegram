@@ -67,6 +67,7 @@
   const modalTitleText = document.getElementById('modalTitleText');
 
   const ruleIdInput = document.getElementById('ruleIdInput');
+  const itemTypeSelect = document.getElementById('itemTypeSelect');
   const ruleNameInput = document.getElementById('ruleNameInput');
   const weaponSelect = document.getElementById('weaponSelect');
   const minPriceInput = document.getElementById('minPriceInput');
@@ -75,6 +76,7 @@
   const maxRerollsInput = document.getElementById('maxRerollsInput');
   const sellerStatusSelect = document.getElementById('sellerStatusSelect');
 
+  const rivenSection = document.getElementById('rivenSection');
   const addPosStatBtn = document.getElementById('addPosStatBtn');
   const posStatsContainer = document.getElementById('posStatsContainer');
   const negModeSelect = document.getElementById('negModeSelect');
@@ -82,14 +84,24 @@
   const negStatSelect = document.getElementById('negStatSelect');
   const negMinInput = document.getElementById('negMinInput');
   const negMaxInput = document.getElementById('negMaxInput');
+
+  const lichSisterSection = document.getElementById('lichSisterSection');
+  const elementSelect = document.getElementById('elementSelect');
+  const minDamageInput = document.getElementById('minDamageInput');
+  const ephemeraSelect = document.getElementById('ephemeraSelect');
+  const quirkSelect = document.getElementById('quirkSelect');
+
   const toastMessage = document.getElementById('toastMessage');
+
+  // Metadata cache by item type
+  const metadataCache = {};
 
   // Load initial data
   init();
 
   async function init() {
     setupEventListeners();
-    const okMeta = await fetchMetadata();
+    const okMeta = await fetchMetadata('riven');
     if (okMeta) {
       await fetchRules();
     }
@@ -102,12 +114,28 @@
       if (e.target === ruleModalOverlay) closeModal();
     });
 
+    itemTypeSelect.addEventListener('change', async () => {
+      const typeVal = itemTypeSelect.value;
+      updateItemTypeUI(typeVal);
+      await fetchMetadata(typeVal);
+    });
+
     addPosStatBtn.addEventListener('click', () => addPosStatRow());
     negModeSelect.addEventListener('change', () => {
       specificNegGroup.style.display = negModeSelect.value === 'specific' ? 'block' : 'none';
     });
 
     ruleForm.addEventListener('submit', handleFormSubmit);
+  }
+
+  function updateItemTypeUI(itemType) {
+    if (itemType === 'riven') {
+      rivenSection.style.display = 'block';
+      lichSisterSection.style.display = 'none';
+    } else {
+      rivenSection.style.display = 'none';
+      lichSisterSection.style.display = 'block';
+    }
   }
 
   function renderUnauthorizedState() {
@@ -141,15 +169,24 @@
     }
   }
 
-  async function fetchMetadata() {
+  async function fetchMetadata(itemType = 'riven') {
+    if (metadataCache[itemType]) {
+      weapons = metadataCache[itemType].weapons || [];
+      attributes = metadataCache[itemType].attributes || [];
+      populateWeaponSelect();
+      populateNegAttributeSelect();
+      refreshPosStatSelects();
+      return true;
+    }
     try {
-      const res = await fetch('/api/riven/meta', { headers: getAuthHeaders() });
+      const res = await fetch(`/api/riven/meta?type=${itemType}`, { headers: getAuthHeaders() });
       if (res.status === 401 || res.status === 403) {
         renderUnauthorizedState();
         return false;
       }
       if (!res.ok) return false;
       const data = await res.json();
+      metadataCache[itemType] = data;
       weapons = data.weapons || [];
       attributes = data.attributes || [];
 
@@ -192,11 +229,21 @@
       const optgroup = document.createElement('optgroup');
       optgroup.label = groupTitles[gKey] || gKey.toUpperCase();
       groups[gKey]
-        .sort((a, b) => a.item_name.localeCompare(b.item_name))
+        .sort((a, b) => {
+          const nameA = a.ru_name || a.item_name;
+          const nameB = b.ru_name || b.item_name;
+          return nameA.localeCompare(nameB, 'ru');
+        })
         .forEach(w => {
           const opt = document.createElement('option');
           opt.value = w.url_name;
-          opt.textContent = w.item_name;
+          if (w.ru_name && w.ru_name.toLowerCase() !== w.item_name.toLowerCase()) {
+            opt.textContent = `${w.item_name} (${w.ru_name})`;
+            opt.dataset.altText = w.ru_name;
+          } else {
+            opt.textContent = w.item_name;
+            opt.dataset.altText = '';
+          }
           optgroup.appendChild(opt);
         });
       weaponSelect.appendChild(optgroup);
@@ -258,7 +305,7 @@
         <div class="empty-state">
           <div class="empty-state-icon">🔎</div>
           <p>У вас пока нет настроенных правил</p>
-          <p style="font-size: 12px; margin-top: 6px;">Нажмите "+ Новое правило", чтобы добавить снайпер ривенов.</p>
+          <p style="font-size: 12px; margin-top: 6px;">Нажмите "+ Новое правило", чтобы добавить снайпер лотов.</p>
         </div>
       `;
       return;
@@ -269,36 +316,65 @@
       const card = document.createElement('div');
       card.className = `rule-card ${rule.is_active ? '' : 'inactive'}`;
 
-      const weaponName = (rule.weapon_url_name === '*' || !rule.weapon_url_name) ? '⚠️ Оружие не выбрано (Запрещено)' : (
-        weapons.find(w => w.url_name === rule.weapon_url_name)?.item_name || rule.weapon_url_name
-      );
+      const itemType = rule.item_type || 'riven';
+      const isRiven = itemType === 'riven';
+      const typeBadge = itemType === 'kuva_lich' ? '🔴 Лич' : (itemType === 'sister_of_parvos' ? '🔵 Сестра' : '🎯 Riven');
+
+      const weaponObj = weapons.find(w => w.url_name === rule.weapon_url_name);
+      let weaponNameLabel = rule.weapon_url_name ? rule.weapon_url_name.replace(/_/g, ' ').toUpperCase() : '';
+      if (weaponObj) {
+        weaponNameLabel = (weaponObj.ru_name && weaponObj.ru_name.toLowerCase() !== weaponObj.item_name.toLowerCase())
+          ? `${weaponObj.item_name} (${weaponObj.ru_name})`
+          : weaponObj.item_name;
+      }
+      const weaponName = (rule.weapon_url_name === '*' || !rule.weapon_url_name) ? '⚠️ Оружие не выбрано (Запрещено)' : weaponNameLabel;
 
       const priceText = rule.max_price ? `до ${rule.max_price} 💎` : 'любая цена';
-      const rerollsText = rule.max_rerolls !== null ? `роллы <= ${rule.max_rerolls}` : '';
 
-      let posTags = (rule.positive_stats || []).map(p => {
-        const attrObj = attributes.find(a => a.url_name === p.url_name);
-        const name = attrObj ? attrObj.effect : p.url_name;
-        const minStr = p.min_value ? `>=${p.min_value}%` : '';
-        return `<span class="tag tag-pos">+ ${name} ${minStr}</span>`;
-      }).join(' ');
+      let detailsHtml = `<span class="tag">${typeBadge}</span> <span class="tag">Статус: ${rule.seller_status}</span>`;
 
-      let negTag = '';
-      if (rule.negative_stat?.mode === 'none') {
-        negTag = '<span class="tag tag-neg">Без негатива</span>';
-      } else if (rule.negative_stat?.mode === 'any') {
-        negTag = '<span class="tag tag-neg">Любой негатив</span>';
-      } else if (rule.negative_stat?.mode === 'specific') {
-        const attrObj = attributes.find(a => a.url_name === rule.negative_stat.url_name);
-        const name = attrObj ? attrObj.effect : rule.negative_stat.url_name;
-        negTag = `<span class="tag tag-neg">- ${name}</span>`;
+      if (isRiven) {
+        const rerollsText = rule.max_rerolls !== null ? `роллы <= ${rule.max_rerolls}` : '';
+        let posTags = (rule.positive_stats || []).map(p => {
+          const attrObj = attributes.find(a => a.url_name === p.url_name);
+          const name = attrObj ? attrObj.effect : p.url_name;
+          const minStr = p.min_value ? `>=${p.min_value}%` : '';
+          return `<span class="tag tag-pos">+ ${name} ${minStr}</span>`;
+        }).join(' ');
+
+        let negTag = '';
+        if (rule.negative_stat?.mode === 'none') {
+          negTag = '<span class="tag tag-neg">Без негатива</span>';
+        } else if (rule.negative_stat?.mode === 'any') {
+          negTag = '<span class="tag tag-neg">Любой негатив</span>';
+        } else if (rule.negative_stat?.mode === 'specific') {
+          const attrObj = attributes.find(a => a.url_name === rule.negative_stat.url_name);
+          const name = attrObj ? attrObj.effect : rule.negative_stat.url_name;
+          negTag = `<span class="tag tag-neg">- ${name}</span>`;
+        }
+        detailsHtml += ` ${posTags} ${negTag} ${rerollsText ? '<span class="tag">🔄 ' + rerollsText + '</span>' : ''}`;
+      } else {
+        if (rule.element && rule.element !== 'any') {
+          detailsHtml += ` <span class="tag tag-pos">⚡ Стихия: ${rule.element.toUpperCase()}</span>`;
+        }
+        if (rule.min_damage) {
+          detailsHtml += ` <span class="tag tag-pos">💥 Урон >= ${rule.min_damage}%</span>`;
+        }
+        if (rule.ephemera_filter === 'yes') {
+          detailsHtml += ` <span class="tag tag-pos">✨ Эфемера</span>`;
+        } else if (rule.ephemera_filter === 'no') {
+          detailsHtml += ` <span class="tag">❌ Без эфемеры</span>`;
+        }
+        if (rule.quirk && rule.quirk !== 'any') {
+          detailsHtml += ` <span class="tag">🎭 Quirk: ${rule.quirk.replace(/_/g, ' ')}</span>`;
+        }
       }
 
       card.innerHTML = `
         <div class="rule-header">
           <div>
             <div class="rule-title">${escapeHtml(rule.name)}</div>
-            <div class="rule-target">🔫 ${escapeHtml(weaponName)} • 💰 ${priceText} ${rerollsText ? '• 🔄 ' + rerollsText : ''}</div>
+            <div class="rule-target">🔫 ${escapeHtml(weaponName)} • 💰 ${priceText}</div>
           </div>
           <div class="rule-actions">
             <label class="toggle-switch">
@@ -310,9 +386,7 @@
           </div>
         </div>
         <div class="rule-details">
-          <span class="tag">Статус продавца: ${rule.seller_status}</span>
-          ${posTags}
-          ${negTag}
+          ${detailsHtml}
         </div>
       `;
 
@@ -333,10 +407,10 @@
     });
 
     document.querySelectorAll('.edit-rule-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         const id = parseInt(btn.dataset.id, 10);
         const rule = rules.find(r => r.id === id);
-        if (rule) openModal(rule);
+        if (rule) await openModal(rule);
       });
     });
 
@@ -392,7 +466,7 @@
     });
   }
 
-  function openModal(rule = null) {
+  async function openModal(rule = null) {
     ruleForm.reset();
     posStatsContainer.innerHTML = '';
     currentPosStatCount = 0;
@@ -401,12 +475,21 @@
       modalTitleText.textContent = 'Редактировать правило';
       ruleIdInput.value = rule.id;
       ruleNameInput.value = rule.name;
+      itemTypeSelect.value = rule.item_type || 'riven';
+      updateItemTypeUI(itemTypeSelect.value);
+      await fetchMetadata(itemTypeSelect.value);
+
       weaponSelect.value = rule.weapon_url_name || '';
       minPriceInput.value = rule.min_price ?? '';
       maxPriceInput.value = rule.max_price ?? '';
       minRerollsInput.value = rule.min_rerolls ?? '';
       maxRerollsInput.value = rule.max_rerolls ?? '';
       sellerStatusSelect.value = rule.seller_status || 'ingame';
+
+      elementSelect.value = rule.element || 'any';
+      minDamageInput.value = rule.min_damage ?? '';
+      ephemeraSelect.value = rule.ephemera_filter || 'any';
+      quirkSelect.value = rule.quirk || 'any';
 
       (rule.positive_stats || []).forEach(p => addPosStatRow(p));
 
@@ -420,8 +503,15 @@
     } else {
       modalTitleText.textContent = 'Создать новое правило';
       ruleIdInput.value = '';
+      itemTypeSelect.value = 'riven';
+      updateItemTypeUI('riven');
+      await fetchMetadata('riven');
       weaponSelect.value = '';
       sellerStatusSelect.value = 'ingame';
+      elementSelect.value = 'any';
+      minDamageInput.value = '';
+      ephemeraSelect.value = 'any';
+      quirkSelect.value = 'any';
       negModeSelect.value = 'any_or_none';
       specificNegGroup.style.display = 'none';
       addPosStatRow();
@@ -445,6 +535,7 @@
       return;
     }
 
+    const itemType = itemTypeSelect.value;
     const positive_stats = [];
     posStatsContainer.querySelectorAll('.stat-row').forEach(row => {
       const sel = row.querySelector('.pos-stat-select');
@@ -472,20 +563,28 @@
 
     const payload = {
       id: ruleIdInput.value ? parseInt(ruleIdInput.value, 10) : null,
-      name: ruleNameInput.value.trim() || 'Riven Rule',
-      item_type: 'riven',
+      name: ruleNameInput.value.trim() || (itemType === 'riven' ? 'Riven Rule' : 'Lich/Sister Rule'),
+      item_type: itemType,
       weapon_url_name: weaponSelect.value,
       target_name: weaponSelect.options[weaponSelect.selectedIndex]?.text || 'Any Weapon',
       min_price: minPriceInput.value ? parseInt(minPriceInput.value, 10) : null,
       max_price: maxPriceInput.value ? parseInt(maxPriceInput.value, 10) : null,
-      min_rerolls: minRerollsInput.value ? parseInt(minRerollsInput.value, 10) : null,
-      max_rerolls: maxRerollsInput.value ? parseInt(maxRerollsInput.value, 10) : null,
       seller_status: sellerStatusSelect.value,
-      positive_stats: positive_stats,
-      negative_stat: negative_stat,
       is_active: true,
       initData: getInitData(),
     };
+
+    if (itemType === 'riven') {
+      payload.min_rerolls = minRerollsInput.value ? parseInt(minRerollsInput.value, 10) : null;
+      payload.max_rerolls = maxRerollsInput.value ? parseInt(maxRerollsInput.value, 10) : null;
+      payload.positive_stats = positive_stats;
+      payload.negative_stat = negative_stat;
+    } else {
+      payload.element = elementSelect.value !== 'any' ? elementSelect.value : null;
+      payload.min_damage = minDamageInput.value ? parseFloat(minDamageInput.value) : null;
+      payload.ephemera_filter = ephemeraSelect.value;
+      payload.quirk = quirkSelect.value !== 'any' ? quirkSelect.value : null;
+    }
 
     await saveRule(payload);
     closeModal();
@@ -661,7 +760,8 @@
               this.optionsData.push({
                 value: opt.value,
                 text: opt.textContent,
-                group: groupTitle
+                group: groupTitle,
+                altText: opt.dataset.altText || ''
               });
             }
           });
@@ -669,7 +769,8 @@
           this.optionsData.push({
             value: child.value,
             text: child.textContent,
-            group: null
+            group: null,
+            altText: child.dataset.altText || ''
           });
         }
       });
@@ -725,8 +826,9 @@
         if (!q) return true;
         const textMatch = item.text.toLowerCase().includes(q);
         const valMatch = item.value.toLowerCase().includes(q);
+        const altMatch = item.altText ? item.altText.toLowerCase().includes(q) : false;
         const groupMatch = item.group ? item.group.toLowerCase().includes(q) : false;
-        return textMatch || valMatch || groupMatch;
+        return textMatch || valMatch || altMatch || groupMatch;
       });
 
       this.renderOptions();

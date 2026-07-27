@@ -49,6 +49,7 @@ class RivenItem:
     group: str
     riven_type: str | None = None
     icon: str | None = None
+    ru_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,18 +63,24 @@ class AuctionAttribute:
 class AuctionItem:
     id: str
     weapon_url_name: str
-    riven_name: str
-    attributes: list[AuctionAttribute]
-    buyout_price: int | None
-    starting_price: int | None
-    rerolls: int
-    mastery_rank: int
-    polarity: str
-    seller_name: str
-    seller_status: str
+    riven_name: str = ""
+    attributes: list[AuctionAttribute] = field(default_factory=list)
+    buyout_price: int | None = None
+    starting_price: int | None = None
+    rerolls: int = 0
+    mastery_rank: int = 0
+    polarity: str = "universal"
+    seller_name: str = "Unknown"
+    seller_status: str = "offline"
     is_direct_sell: bool = True
     created_at: str | None = None
     updated_at: str | None = None
+    item_type: str = "riven"
+    element: str | None = None
+    damage: float | None = None
+    having_ephemera: bool = False
+    ephemera: str | None = None
+    quirk: str | None = None
 
 
 @dataclass
@@ -91,6 +98,10 @@ class SniperRule:
     positive_stats: list[dict] = field(default_factory=list)
     negative_stat: dict = field(default_factory=dict)
     is_active: bool = True
+    element: str = "any"
+    min_damage: float | int | None = None
+    ephemera_filter: str = "any"
+    quirk: str = "any"
 
     def to_dict(self) -> dict:
         return {
@@ -107,6 +118,10 @@ class SniperRule:
             "positive_stats": self.positive_stats,
             "negative_stat": self.negative_stat,
             "is_active": self.is_active,
+            "element": self.element,
+            "min_damage": self.min_damage,
+            "ephemera_filter": self.ephemera_filter,
+            "quirk": self.quirk,
         }
 
     @classmethod
@@ -125,5 +140,10 @@ class SniperRule:
             positive_stats=data.get("positive_stats") or [],
             negative_stat=data.get("negative_stat") or {},
             is_active=data.get("is_active", True),
+            element=data.get("element") or "any",
+            min_damage=data.get("min_damage"),
+            ephemera_filter=data.get("ephemera_filter") or "any",
+            quirk=data.get("quirk") or "any",
         )
+
 
