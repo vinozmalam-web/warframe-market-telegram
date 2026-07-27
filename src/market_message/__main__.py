@@ -67,6 +67,8 @@ async def async_main() -> int:
         telegram=telegram,
         state=state,
         market_base_url=getattr(config, "market_base_url", "https://warframe.market"),
+        max_alerts_per_rule_run=getattr(config, "max_alerts_per_rule_run", 3),
+        seen_auction_ttl_days=getattr(config, "seen_auction_ttl_days", 7),
     )
     web_server = WebServer(
         config=config,

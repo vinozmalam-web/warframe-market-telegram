@@ -264,3 +264,133 @@ def test_matches_rule_seller_status_levels():
     assert matches_rule(rule_online, auc_online) is True
     assert matches_rule(rule_online, auc_offline) is False
 
+
+def test_broad_rule_notification_cap(tmp_path):
+    from market_message.sniper import RivenSniperEngine
+    from market_message.state import StateStore
+
+    sent_messages = []
+
+    class FakeTelegram:
+        def send_message(self, text, parse_mode=None, reply_markup=None):
+            sent_messages.append(text)
+            return True
+
+    class FakeWarframe:
+        def search_auctions(self, type_="riven", weapon_url_name=None):
+            return [
+                AuctionItem(
+                    id=f"auc_{i}",
+                    weapon_url_name="rubico",
+                    riven_name=f"rubico_{i}",
+                    attributes=[],
+                    buyout_price=100 + i,
+                    starting_price=100 + i,
+                    rerolls=0,
+                    mastery_rank=10,
+                    polarity="madurai",
+                    seller_name=f"Seller{i}",
+                    seller_status="ingame",
+                )
+                for i in range(10)
+            ]
+
+    state = StateStore(tmp_path / "test_state.sqlite")
+    rule = SniperRule(name="Broad Rubico Rule", weapon_url_name="rubico", is_active=True)
+    state.create_sniper_rule(rule)
+
+    engine = RivenSniperEngine(
+        warframe=FakeWarframe(),
+        telegram=FakeTelegram(),
+        state=state,
+        market_base_url="https://warframe.market",
+        max_alerts_per_rule_run=3,
+    )
+
+    notified = engine.check_auctions_once()
+
+    # 3 auction notifications sent out of 10 matches
+    assert notified == 3
+    # Total sent telegram messages = 3 alerts + 1 summary message
+    assert len(sent_messages) == 4
+    assert "Сработало широкое правило" in sent_messages[-1]
+    assert "Найдено совпадений: <b>10</b>" in sent_messages[-1]
+
+    # Check that all 10 auctions were marked as seen in state store
+    for i in range(10):
+        assert state.was_auction_seen(f"auc_{i}") is True
+
+    # Second check run should find 0 new items
+    sent_messages.clear()
+    second_notified = engine.check_auctions_once()
+    assert second_notified == 0
+    assert len(sent_messages) == 0
+
+
+def test_sniper_price_drop_retrigger(tmp_path):
+    from market_message.sniper import RivenSniperEngine
+    from market_message.state import StateStore
+
+    sent_messages = []
+
+    class FakeTelegram:
+        def send_message(self, text, parse_mode=None, reply_markup=None):
+            sent_messages.append(text)
+            return True
+
+    class DynamicWarframe:
+        def __init__(self):
+            self.price = 1000
+
+        def search_auctions(self, type_="riven", weapon_url_name=None):
+            return [
+                AuctionItem(
+                    id="auc_pd_1",
+                    weapon_url_name="vectis",
+                    riven_name="vectis croni-crit",
+                    attributes=[],
+                    buyout_price=self.price,
+                    starting_price=self.price,
+                    rerolls=0,
+                    mastery_rank=12,
+                    polarity="madurai",
+                    seller_name="Seller1",
+                    seller_status="ingame",
+                )
+            ]
+
+    state = StateStore(tmp_path / "test_state.sqlite")
+    rule = SniperRule(name="Vectis Rule", weapon_url_name="vectis", max_price=1200, is_active=True)
+    state.create_sniper_rule(rule)
+
+    wf_client = DynamicWarframe()
+    engine = RivenSniperEngine(
+        warframe=wf_client,
+        telegram=FakeTelegram(),
+        state=state,
+        market_base_url="https://warframe.market",
+    )
+
+    # First check run at 1000p
+    notified_1 = engine.check_auctions_once()
+    assert notified_1 == 1
+    assert "1000 💎" in sent_messages[0]
+    assert "Снижение цены" not in sent_messages[0]
+
+    # Second check run at same 1000p -> 0 alerts sent
+    sent_messages.clear()
+    notified_2 = engine.check_auctions_once()
+    assert notified_2 == 0
+
+    # Third check run: Seller lowers price to 450p -> Alert RETRIGGERED with price drop badge!
+    sent_messages.clear()
+    wf_client.price = 450
+    notified_3 = engine.check_auctions_once()
+    assert notified_3 == 1
+    assert "Снижение цены на Riven" in sent_messages[0]
+    assert "450 💎" in sent_messages[0]
+    assert "было 1000 💎" in sent_messages[0]
+    assert state.get_seen_auction_price("auc_pd_1") == 450
+
+
+

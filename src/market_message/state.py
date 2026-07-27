@@ -165,23 +165,66 @@ class StateStore:
         with self._connect() as conn:
             conn.execute("DELETE FROM sniper_rules WHERE id = ?", (rule_id,))
 
-    def was_auction_seen(self, auction_id: str) -> bool:
+    def get_seen_auction_price(self, auction_id: str) -> int | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT 1 FROM seen_auctions WHERE auction_id = ?",
+                "SELECT last_price FROM seen_auctions WHERE auction_id = ?",
                 (auction_id,),
             ).fetchone()
-        return row is not None
+        if row is None or row[0] is None:
+            return None
+        try:
+            return int(row[0])
+        except (ValueError, TypeError):
+            return None
 
-    def mark_auction_seen(self, auction_id: str, rule_id: int | None = None) -> None:
+    def was_auction_seen(self, auction_id: str, price: int | None = None) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT last_price FROM seen_auctions WHERE auction_id = ?",
+                (auction_id,),
+            ).fetchone()
+        if row is None:
+            return False
+        if price is None:
+            return True
+        stored_price = row[0]
+        if stored_price is None:
+            return False
+        try:
+            return int(stored_price) == int(price)
+        except (ValueError, TypeError):
+            return False
+
+    def mark_auction_seen(
+        self,
+        auction_id: str,
+        rule_id: int | None = None,
+        price: int | None = None,
+    ) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT OR IGNORE INTO seen_auctions (auction_id, rule_id)
-                VALUES (?, ?)
+                INSERT INTO seen_auctions (auction_id, rule_id, last_price, seen_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(auction_id) DO UPDATE SET
+                    rule_id = excluded.rule_id,
+                    last_price = excluded.last_price,
+                    seen_at = CURRENT_TIMESTAMP
                 """,
-                (auction_id, rule_id),
+                (auction_id, rule_id, price),
             )
+
+    def cleanup_old_seen_auctions(self, days: int = 7) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM seen_auctions
+                WHERE datetime(seen_at) < datetime('now', '-' || ? || ' days')
+                """,
+                (days,),
+            )
+            return cursor.rowcount
 
     def _init_schema(self) -> None:
         with self._connect() as conn:
@@ -229,10 +272,16 @@ class StateStore:
                 CREATE TABLE IF NOT EXISTS seen_auctions (
                     auction_id TEXT PRIMARY KEY,
                     rule_id INTEGER,
+                    last_price INTEGER,
                     seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
+            # Migration: Add last_price column if table exists without it
+            cursor = conn.execute("PRAGMA table_info(seen_auctions)")
+            cols = [row[1] for row in cursor.fetchall()]
+            if "last_price" not in cols:
+                conn.execute("ALTER TABLE seen_auctions ADD COLUMN last_price INTEGER")
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path)

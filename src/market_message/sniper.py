@@ -95,12 +95,24 @@ def format_stat_name(url_name: str) -> str:
     return clean
 
 
-def format_riven_notification(auction: AuctionItem, rule: SniperRule, market_base_url: str) -> str:
-    price_str = f"{auction.buyout_price} 💎" if auction.buyout_price is not None else (
-        f"{auction.starting_price} 💎 (Аукцион)" if auction.starting_price is not None else "Н/Д"
-    )
+def format_riven_notification(
+    auction: AuctionItem,
+    rule: SniperRule,
+    market_base_url: str,
+    old_price: int | None = None,
+) -> str:
+    current_price = auction.buyout_price if auction.buyout_price is not None else auction.starting_price
+    if current_price is not None:
+        if old_price is not None and old_price > current_price:
+            price_str = f"{current_price} 💎 <i>(📉 было {old_price} 💎)</i>"
+        else:
+            price_str = f"{current_price} 💎" if auction.buyout_price is not None else f"{auction.starting_price} 💎 (Аукцион)"
+    else:
+        price_str = "Н/Д"
+
     status_emoji = "🟢" if auction.seller_status == "ingame" else ("🟡" if auction.seller_status == "online" else "⚪")
-    
+    header_title = "📉 <b>СНАЙПЕР: Снижение цены на Riven!</b>" if (old_price is not None and current_price is not None and old_price > current_price) else "🎯 <b>СНАЙПЕР: Найден Riven!</b>"
+
     attr_lines = []
     for attr in auction.attributes:
         sign = "+" if attr.positive else "-"
@@ -114,7 +126,7 @@ def format_riven_notification(auction: AuctionItem, rule: SniperRule, market_bas
     auction_url = f"{market_base_url}/auction/{auction.id}"
 
     return (
-        f"🎯 <b>СНАЙПЕР: Найден Riven!</b>\n"
+        f"{header_title}\n"
         f"📋 <b>Правило</b>: <i>{_escape_html(rule.name)}</i>\n\n"
         f"🔫 <b>Оружие</b>: <b>{_escape_html(auction.riven_name.title())}</b>\n"
         f"💰 <b>Цена</b>: <b>{price_str}</b>\n"
@@ -142,13 +154,22 @@ class RivenSniperEngine:
         telegram: TelegramClient,
         state: StateStore,
         market_base_url: str,
+        max_alerts_per_rule_run: int = 3,
+        seen_auction_ttl_days: int = 7,
     ):
         self.warframe = warframe
         self.telegram = telegram
         self.state = state
         self.market_base_url = market_base_url
+        self.max_alerts_per_rule_run = max_alerts_per_rule_run
+        self.seen_auction_ttl_days = seen_auction_ttl_days
 
     def check_auctions_once(self) -> int:
+        try:
+            self.state.cleanup_old_seen_auctions(self.seen_auction_ttl_days)
+        except Exception as exc:
+            logger.warning("Failed to clean up old seen auctions: %s", exc)
+
         rules = [r for r in self.state.get_sniper_rules() if r.is_active]
         if not rules:
             return 0
@@ -167,25 +188,59 @@ class RivenSniperEngine:
                 logger.warning("Failed to search riven auctions for weapon '%s': %s", w_name, exc)
                 continue
 
-            for auction in auctions:
-                if self.state.was_auction_seen(auction.id):
+            for rule in group_rules:
+                unseen_matches = []
+                auction_old_prices: dict[str, int | None] = {}
+                for auction in auctions:
+                    auction_price = auction.buyout_price if auction.buyout_price is not None else auction.starting_price
+                    if self.state.was_auction_seen(auction.id, price=auction_price):
+                        continue
+                    old_price = self.state.get_seen_auction_price(auction.id)
+                    if matches_rule(rule, auction):
+                        unseen_matches.append(auction)
+                        auction_old_prices[auction.id] = old_price
+                    else:
+                        self.state.mark_auction_seen(auction.id, rule.id, price=auction_price)
+
+                if not unseen_matches:
                     continue
 
-                for rule in group_rules:
-                    if matches_rule(rule, auction):
-                        msg = format_riven_notification(auction, rule, self.market_base_url)
-                        try:
-                            self.telegram.send_message(msg, parse_mode="HTML")
-                            self.state.mark_auction_seen(auction.id, rule.id)
-                            notified_count += 1
-                            logger.info(
-                                "Sniper alert sent for auction %s (rule: %s, weapon: %s)",
-                                auction.id,
-                                rule.name,
-                                auction.riven_name,
-                            )
-                            break
-                        except Exception as exc:
-                            logger.exception("Failed to send telegram notification for auction %s: %s", auction.id, exc)
+                send_batch = unseen_matches[: self.max_alerts_per_rule_run]
+                skipped_batch = unseen_matches[self.max_alerts_per_rule_run :]
+
+                for auction in send_batch:
+                    auction_price = auction.buyout_price if auction.buyout_price is not None else auction.starting_price
+                    old_price = auction_old_prices.get(auction.id)
+                    msg = format_riven_notification(auction, rule, self.market_base_url, old_price=old_price)
+                    try:
+                        self.telegram.send_message(msg, parse_mode="HTML")
+                        self.state.mark_auction_seen(auction.id, rule.id, price=auction_price)
+                        notified_count += 1
+                        logger.info(
+                            "Sniper alert sent for auction %s (rule: %s, weapon: %s, price: %s)",
+                            auction.id,
+                            rule.name,
+                            auction.riven_name,
+                            auction_price,
+                        )
+                    except Exception as exc:
+                        logger.exception("Failed to send telegram notification for auction %s: %s", auction.id, exc)
+
+                if skipped_batch:
+                    for auction in skipped_batch:
+                        auction_price = auction.buyout_price if auction.buyout_price is not None else auction.starting_price
+                        self.state.mark_auction_seen(auction.id, rule.id, price=auction_price)
+
+                    summary_msg = (
+                        f"ℹ️ <b>Снайпер: Сработало широкое правило</b>\n"
+                        f"📋 <b>Правило</b>: <i>{_escape_html(rule.name)}</i>\n"
+                        f"📊 Найдено совпадений: <b>{len(unseen_matches)}</b>\n"
+                        f"Отправлено первых <b>{len(send_batch)}</b> уведомлений. "
+                        f"Остальные <b>{len(skipped_batch)}</b> отмечены как просмотренные для защиты от спама."
+                    )
+                    try:
+                        self.telegram.send_message(summary_msg, parse_mode="HTML")
+                    except Exception as exc:
+                        logger.exception("Failed to send summary message: %s", exc)
 
         return notified_count

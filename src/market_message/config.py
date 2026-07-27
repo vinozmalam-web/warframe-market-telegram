@@ -28,6 +28,8 @@ class Config:
     web_port: int = 8080
     web_app_url: str = ""
     riven_poll_interval_seconds: int = 5
+    max_alerts_per_rule_run: int = 3
+    seen_auction_ttl_days: int = 7
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Config":
@@ -63,6 +65,14 @@ class Config:
         if riven_poll_interval_seconds < 1:
             raise ConfigError("RIVEN_POLL_INTERVAL_SECONDS must be at least 1")
 
+        max_alerts_per_rule_run = _int_env(values, "MAX_ALERTS_PER_RULE_RUN", 3)
+        if max_alerts_per_rule_run < 1:
+            raise ConfigError("MAX_ALERTS_PER_RULE_RUN must be at least 1")
+
+        seen_auction_ttl_days = _int_env(values, "SEEN_AUCTION_TTL_DAYS", 7)
+        if seen_auction_ttl_days < 1:
+            raise ConfigError("SEEN_AUCTION_TTL_DAYS must be at least 1")
+
         request_timeout_seconds = _float_env(values, "REQUEST_TIMEOUT_SECONDS", 20.0)
         if request_timeout_seconds <= 0:
             raise ConfigError("REQUEST_TIMEOUT_SECONDS must be greater than 0")
@@ -87,6 +97,8 @@ class Config:
             web_port=web_port,
             web_app_url=web_app_url,
             riven_poll_interval_seconds=riven_poll_interval_seconds,
+            max_alerts_per_rule_run=max_alerts_per_rule_run,
+            seen_auction_ttl_days=seen_auction_ttl_days,
         )
 
 
