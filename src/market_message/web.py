@@ -63,6 +63,7 @@ class WebServer:
             body_token = body_json.get("token") if isinstance(body_json, dict) else None
             token = header_token or query_token or body_token
             if token and hmac.compare_digest(token, secret_token):
+                logger.info("[AUTH] Secret token validated successfully")
                 return True
 
         # 2. Check Telegram initData
@@ -71,18 +72,41 @@ class WebServer:
         body_data = body_json.get("initData") if isinstance(body_json, dict) else None
         init_data = header_data or query_data or body_data
 
-        if init_data:
-            user = extract_user_from_init_data(init_data, self.config.telegram_bot_token)
-            if user:
-                user_id = str(user.get("id"))
-                if user_id and user_id == str(self.config.telegram_chat_id):
-                    return True
-                logger.warning(
-                    "Access denied for Telegram user_id=%s (expected %s)",
-                    user_id,
-                    self.config.telegram_chat_id,
-                )
+        if not init_data:
+            logger.warning(
+                "[AUTH FAILED] No initData or secret token provided in request to %s (Headers: %s)",
+                request.path,
+                list(request.headers.keys()),
+            )
+            return False
 
+        is_signature_valid = validate_init_data(init_data, self.config.telegram_bot_token)
+        if not is_signature_valid:
+            logger.warning(
+                "[AUTH FAILED] Telegram initData HMAC signature invalid! "
+                "(bot_token prefix=%s..., init_data_sample=%.80s)",
+                self.config.telegram_bot_token[:6] if self.config.telegram_bot_token else "EMPTY",
+                init_data,
+            )
+            return False
+
+        user = extract_user_from_init_data(init_data, self.config.telegram_bot_token)
+        if not user:
+            logger.warning("[AUTH FAILED] Signature valid, but 'user' field is missing or invalid in initData")
+            return False
+
+        user_id = str(user.get("id"))
+        expected_chat_id = str(self.config.telegram_chat_id)
+        if user_id and user_id == expected_chat_id:
+            logger.info("[AUTH SUCCESS] User %s authenticated via Telegram initData", user_id)
+            return True
+
+        logger.warning(
+            "[AUTH FAILED] User ID mismatch! Telegram user_id=%s (username=%s), but configured TELEGRAM_CHAT_ID=%s",
+            user_id,
+            user.get("username", "N/A"),
+            expected_chat_id,
+        )
         return False
 
     async def handle_riven_meta(self, request: web.Request) -> web.Response:
