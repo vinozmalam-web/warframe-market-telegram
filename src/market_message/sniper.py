@@ -182,11 +182,45 @@ class RivenSniperEngine:
 
         notified_count = 0
         for w_name, group_rules in weapon_groups.items():
-            try:
-                auctions = self.warframe.search_auctions(type_="riven", weapon_url_name=w_name)
-            except Exception as exc:
-                logger.warning("Failed to search riven auctions for weapon '%s': %s", w_name, exc)
-                continue
+            auctions: list[AuctionItem] = []
+            if w_name != "*":
+                try:
+                    auctions = self.warframe.search_auctions(type_="riven", weapon_url_name=w_name)
+                except Exception as exc:
+                    logger.warning("Failed to search riven auctions for weapon '%s': %s", w_name, exc)
+                    continue
+            else:
+                # Handle wildcard weapon ("*")
+                pos_stats: list[str] = []
+                for r in group_rules:
+                    for stat in r.positive_stats:
+                        url_name = stat.get("url_name") if isinstance(stat, dict) else None
+                        if url_name and url_name not in pos_stats:
+                            pos_stats.append(str(url_name))
+
+                if pos_stats:
+                    try:
+                        auctions = self.warframe.search_auctions(type_="riven", positive_stats=pos_stats)
+                    except Exception as exc:
+                        logger.warning("Failed to search riven auctions for wildcard weapon with stats %s: %s", pos_stats, exc)
+                        continue
+                else:
+                    try:
+                        riven_items = self.warframe.get_riven_items()
+                    except Exception as exc:
+                        logger.warning("Failed to get riven items for wildcard search: %s", exc)
+                        riven_items = []
+
+                    seen_auction_ids = set()
+                    for item in riven_items:
+                        try:
+                            item_auctions = self.warframe.search_auctions(type_="riven", weapon_url_name=item.url_name)
+                            for auc in item_auctions:
+                                if auc.id not in seen_auction_ids:
+                                    seen_auction_ids.add(auc.id)
+                                    auctions.append(auc)
+                        except Exception as exc:
+                            logger.warning("Failed to search riven auctions for weapon '%s': %s", item.url_name, exc)
 
             for rule in group_rules:
                 unseen_matches = []

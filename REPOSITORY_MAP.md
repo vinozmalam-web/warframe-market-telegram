@@ -20,14 +20,14 @@
 - **`warframe.py`**
   - `Назначение`: Клиент для работы с REST API и WebSocket Warframe Market (аутентификация, чаты, аукционы, справочники Riven v1/v2 и фолбэк-списки).
   - `Точки входа`: `WarframeMarketClient`, `extract_riven_items`, `extract_riven_attributes`, `FALLBACK_RIVEN_ITEMS`, `FALLBACK_RIVEN_ATTRIBUTES`
-  - `Контракты`: Использование токенов сессий, поддержка v2 API (`/v2/riven/weapons`, `/v2/riven/attributes`), ограничение частоты запросов (rate limit <= 3 RPS), автоматический retry при HTTP 429, статическая страховка при сбоях API, обработка ошибок авторизации.
+  - `Контракты`: Использование токенов сессий, поддержка v2 API (`/v2/riven/weapons`, `/v2/riven/attributes`), ограничение частоты запросов (rate limit <= 3 RPS), автоматический retry при HTTP 429, статическая страховка при сбоях API, обработка ошибок авторизации, поиск аукционов по оружию, фильтрам характеристик (`positive_stats`) и сортировке.
 - **`telegram.py`**
   - `Назначение`: Клиент Telegram Bot API для отправки уведомлений, обработки reply, вызова Telegram Mini App и валидации `initData`.
   - `Точки входа`: `TelegramClient`, `validate_init_data`, `extract_user_from_init_data`
 - **`sniper.py`**
   - `Назначение`: Движок фильтрации и снайпинга лотов по правилам пользователя.
   - `Точки входа`: `RivenSniperEngine`
-  - `Контракты`: Ограничение отправки уведомлений за один проход по широким правилам (`MAX_ALERTS_PER_RULE_RUN`), отслеживание снижения цен на ранее найденных лотах, автоматическая очистка устаревших лотов (`SEEN_AUCTION_TTL_DAYS`), сводная сводка в Telegram для защиты от спама.
+  - `Контракты`: Ограничение отправки уведомлений за один проход по широким правилам (`MAX_ALERTS_PER_RULE_RUN`), отслеживание снижения цен на ранее найденных лотах, автоматическая очистка устаревших лотов (`SEEN_AUCTION_TTL_DAYS`), сводная сводка в Telegram для защиты от спама, поддержка правил на любое оружие (`*`) через фильтрацию по `positive_stats` или обход доступных оружий.
 - **`web.py`**
   - `Назначение`: HTTP-сервер для обработки запросов Telegram Mini App и отдачи статики.
   - `Точки входа`: `run_web_server()`, `WebServer.handle_index`, `WebServer._validate_request_auth`
@@ -44,6 +44,10 @@
   - `Назначение`: Фронтенд Telegram Mini App (HTML, CSS, JS, Service Worker).
   - `Точки входа`: `app/web/static/index.html`, `app/web/static/app.js`, `app/web/static/style.css`, `app/web/static/service-worker.js`
   - `Контракты`: Поддержка тёмного интерфейса TMA, валидация формы, управление версией SW (`const SW_VERSION = "..."`).
+
+### `ВАЖНОЕ ЗАМЕЧАНИЕ`
+при изменении фронтенда (app/web) необходимо инкрементировать версию в index.html 
+
 
 ### `docs/`
 - **`deployment.md`**

@@ -167,10 +167,25 @@ class WarframeMarketClient:
         logger.info("Using fallback static riven attributes list")
         return FALLBACK_RIVEN_ATTRIBUTES
 
-    def search_auctions(self, type_: str = "riven", weapon_url_name: str | None = None) -> list[AuctionItem]:
+    def search_auctions(
+        self,
+        type_: str = "riven",
+        weapon_url_name: str | None = None,
+        positive_stats: str | list[str] | None = None,
+        sort_by: str | None = None,
+    ) -> list[AuctionItem]:
         path = f"/auctions/search?type={type_}"
         if weapon_url_name and weapon_url_name != "*":
             path += f"&weapon_url_name={weapon_url_name}"
+        if positive_stats:
+            if isinstance(positive_stats, (list, tuple, set)):
+                stats_str = ",".join(positive_stats)
+            else:
+                stats_str = str(positive_stats)
+            if stats_str:
+                path += f"&positive_stats={stats_str}"
+        if sort_by:
+            path += f"&sort_by={sort_by}"
         data = self._request("GET", path)
         return extract_auctions(data)
 
