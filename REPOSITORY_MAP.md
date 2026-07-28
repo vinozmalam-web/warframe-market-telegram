@@ -13,7 +13,7 @@
 - **`models.py`**
   - `Назначение`: Структуры данных (dataclass) для сообщений, чатов, аукционов (Riven / Lich / Sister) и правил снайпера.
   - `Точки входа`: `ChatMessage`, `AuctionItem`, `SniperRule`, `RivenItem`
-  - `Контракты`: Поддержка специфичных полей для Личей и Сестер (`item_type`, `element`, `damage`, `having_ephemera`, `ephemera`, `quirk`, `min_damage`, `ephemera_filter`).
+  - `Контракты`: Поддержка специфичных полей для Личей и Сестер (`item_type`, `element`, `damage`, `having_ephemera`, `ephemera`, `quirk`, `min_damage`, `ephemera_filter`) и режима выкупа (`buyout_policy`: `any`, `direct`, `auction`).
 - **`state.py`**
   - `Назначение`: SQLite-хранилище обработанных сообщений, просмотренных аукционов и правил снайпинга.
   - `Точки входа`: `StateStore`
@@ -28,7 +28,7 @@
 - **`sniper.py`**
   - `Назначение`: Движок фильтрации и снайпинга лотов (Riven, Кува Личей, Сестер Парвоса) по правилам пользователя.
   - `Точки входа`: `RivenSniperEngine`, `matches_rule`, `format_riven_notification`
-  - `Контракты`: Ограничение отправки уведомлений за один проход по широким правилам (`MAX_ALERTS_PER_RULE_RUN`), отслеживание снижения цен на ранее найденных лотах, автоматическая очистка устаревших лотов (`SEEN_AUCTION_TTL_DAYS`), специализированное форматирование Telegram-уведомлений для Riven и Lich/Sister, полное отключение поиска по "любому оружию" (`*`) для предотвращения исчерпания API rate limit (429 Too Many Requests).
+  - `Контракты`: Ограничение отправки уведомлений за один проход по широким правилам (`MAX_ALERTS_PER_RULE_RUN`), отслеживание снижения цен на ранее найденных лотах, автоматическая очистка устаревших лотов (`SEEN_AUCTION_TTL_DAYS`), специализированное форматирование Telegram-уведомлений для Riven (с выводом полного названия оружия и мода, например "Sobek Manti-Gelimag") и Lich/Sister, поддержка фильтрации лотов по типу выкупа (`buyout_policy`), полное отключение поиска по "любому оружию" (`*`) для предотвращения исчерпания API rate limit (429 Too Many Requests).
 - **`web.py`**
   - `Назначение`: HTTP-сервер для обработки запросов Telegram Mini App и отдачи статики.
   - `Точки входа`: `run_web_server()`, `WebServer.handle_index`, `WebServer.handle_riven_meta`, `WebServer._validate_request_auth`
@@ -44,7 +44,7 @@
 - **`static/`**
   - `Назначение`: Фронтенд Telegram Mini App (HTML, CSS, JS, Service Worker).
   - `Точки входа`: `app/web/static/index.html`, `app/web/static/app.js`, `app/web/static/style.css`, `app/web/static/service-worker.js`
-  - `Контракты`: Поддержка тёмного интерфейса TMA, выбор типа правила (`riven`, `kuva_lich`, `sister_of_parvos`), динамическое переключение формы (скрытие Riven-полей и показ фильтров стихии, урона, эфемеры, причуд), кастомные дропдауны с текстовым поиском по английскому и русскому названию оружия/характеристик (`SearchableSelect`), управление версией SW (`const SW_VERSION = "..."`).
+  - `Контракты`: Поддержка тёмного интерфейса TMA, выбор типа правила (`riven`, `kuva_lich`, `sister_of_parvos`), динамическое переключение формы (скрытие Riven-полей и показ фильтров стихии, урона, эфемеры, причуд), выбор режима выкупа (все лоты / исключить аукционы / только аукционы), кастомные дропдауны с текстовым поиском по английскому и русскому названию оружия/характеристик (`SearchableSelect`), управление версией SW (`const SW_VERSION = "edcsod-pwa-v10"`).
 
 ### `ВАЖНОЕ ЗАМЕЧАНИЕ`
 при изменении фронтенда (app/web) необходимо инкрементировать версию в index.html и service-worker.js

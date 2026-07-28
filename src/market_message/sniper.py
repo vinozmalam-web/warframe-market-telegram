@@ -20,7 +20,16 @@ def matches_rule(rule: SniperRule, auction: AuctionItem) -> bool:
     if rule_type != auction_type:
         return False
 
+    # Buyout policy / auction exclusion check
+    if rule.buyout_policy == "direct":
+        if auction.buyout_price is None or not auction.is_direct_sell:
+            return False
+    elif rule.buyout_policy == "auction":
+        if auction.buyout_price is not None and auction.is_direct_sell:
+            return False
+
     # 1. Weapon check
+
     if rule.weapon_url_name and rule.weapon_url_name != "*":
         if rule.weapon_url_name.lower() != auction.weapon_url_name.lower():
             return False
@@ -164,12 +173,24 @@ def format_riven_notification(
             attr_lines.append(f"{emoji} <code>{sign}{val_str}% {name}</code>")
 
         stats_block = "\n".join(attr_lines) if attr_lines else "<i>Нет характеристик</i>"
-        whisper_cmd = f"/w {auction.seller_name} Hi! WTB your [{auction.riven_name}] for {auction.buyout_price or auction.starting_price or 0}p (warframe.market)"
+        weapon_display = auction.weapon_url_name.replace("_", " ").title() if auction.weapon_url_name and auction.weapon_url_name != "*" else ""
+        riven_display = (auction.riven_name or "").strip()
+        weapon_words = [w.lower() for w in weapon_display.split() if len(w) >= 3]
+        already_has_weapon = any(w in riven_display.lower() for w in weapon_words) if weapon_words else False
+
+        if already_has_weapon:
+            full_riven_name = riven_display.title()
+        elif weapon_display and riven_display:
+            full_riven_name = f"{weapon_display} {riven_display}".title()
+        else:
+            full_riven_name = (riven_display or weapon_display).title()
+
+        whisper_cmd = f"/w {auction.seller_name} Hi! WTB your [{full_riven_name}] for {auction.buyout_price or auction.starting_price or 0}p (warframe.market)"
 
         return (
             f"{header_title}\n"
             f"📋 <b>Правило</b>: <i>{_escape_html(rule.name)}</i>\n\n"
-            f"🔫 <b>Оружие</b>: <b>{_escape_html(auction.riven_name.title())}</b>\n"
+            f"🔫 <b>Оружие</b>: <b>{_escape_html(full_riven_name)}</b>\n"
             f"💰 <b>Цена</b>: <b>{price_str}</b>\n"
             f"👤 <b>Продавец</b>: {status_emoji} <b>{_escape_html(auction.seller_name)}</b> ({auction.seller_status})\n"
             f"🔄 <b>Роллы</b>: {auction.rerolls} | <b>MR</b>: {auction.mastery_rank} | <b>Полярность</b>: {auction.polarity.title()}\n\n"

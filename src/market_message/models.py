@@ -102,6 +102,7 @@ class SniperRule:
     min_damage: float | int | None = None
     ephemera_filter: str = "any"
     quirk: str = "any"
+    buyout_policy: str = "any"
 
     def to_dict(self) -> dict:
         return {
@@ -122,6 +123,7 @@ class SniperRule:
             "min_damage": self.min_damage,
             "ephemera_filter": self.ephemera_filter,
             "quirk": self.quirk,
+            "buyout_policy": self.buyout_policy,
         }
 
     @classmethod
@@ -144,6 +146,8 @@ class SniperRule:
             min_damage=data.get("min_damage"),
             ephemera_filter=data.get("ephemera_filter") or "any",
             quirk=data.get("quirk") or "any",
+            buyout_policy=data.get("buyout_policy") or "any",
         )
+
 
 

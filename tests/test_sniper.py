@@ -117,7 +117,54 @@ def test_format_riven_notification():
     assert "Rubico Croni-Crit" in html
     assert "1500 💎" in html
     assert "BestSeller" in html
-    assert "/w BestSeller Hi! WTB your [rubico croni-crit] for 1500p" in html
+    assert "/w BestSeller Hi! WTB your [Rubico Croni-Crit] for 1500p (warframe.market)" in html
+
+
+def test_format_riven_notification_sobek_manti_gelimag():
+    rule = SniperRule(name="Sobek Rule")
+    auction = AuctionItem(
+        id="auc_sobek",
+        weapon_url_name="sobek",
+        riven_name="manti-gelimag",
+        attributes=[],
+        buyout_price=500,
+        seller_name="SobekFan",
+        seller_status="ingame",
+    )
+
+    html = format_riven_notification(auction, rule, "https://warframe.market")
+    assert "Sobek Manti-Gelimag" in html
+    assert "/w SobekFan Hi! WTB your [Sobek Manti-Gelimag] for 500p (warframe.market)" in html
+
+
+def test_matches_rule_buyout_policy():
+    rule_direct = SniperRule(name="Direct Sell Only", buyout_policy="direct")
+    rule_auction = SniperRule(name="Auction Only", buyout_policy="auction")
+    rule_any = SniperRule(name="Any Policy", buyout_policy="any")
+
+    direct_auc = AuctionItem(
+        id="direct_1",
+        weapon_url_name="rubico",
+        buyout_price=500,
+        is_direct_sell=True,
+    )
+    bidding_auc = AuctionItem(
+        id="bidding_1",
+        weapon_url_name="rubico",
+        starting_price=100,
+        buyout_price=None,
+        is_direct_sell=False,
+    )
+
+    assert matches_rule(rule_direct, direct_auc) is True
+    assert matches_rule(rule_direct, bidding_auc) is False
+
+    assert matches_rule(rule_auction, direct_auc) is False
+    assert matches_rule(rule_auction, bidding_auc) is True
+
+    assert matches_rule(rule_any, direct_auc) is True
+    assert matches_rule(rule_any, bidding_auc) is True
+
 
 
 def test_matches_rule_multiple_positive_stats_and_bounds():

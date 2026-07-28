@@ -75,6 +75,7 @@
   const minRerollsInput = document.getElementById('minRerollsInput');
   const maxRerollsInput = document.getElementById('maxRerollsInput');
   const sellerStatusSelect = document.getElementById('sellerStatusSelect');
+  const buyoutPolicySelect = document.getElementById('buyoutPolicySelect');
 
   const rivenSection = document.getElementById('rivenSection');
   const addPosStatBtn = document.getElementById('addPosStatBtn');
@@ -331,7 +332,14 @@
 
       const priceText = rule.max_price ? `до ${rule.max_price} 💎` : 'любая цена';
 
-      let detailsHtml = `<span class="tag">${typeBadge}</span> <span class="tag">Статус: ${rule.seller_status}</span>`;
+      let buyoutTag = '';
+      if (rule.buyout_policy === 'direct') {
+        buyoutTag = '<span class="tag">⚡ Только выкуп</span>';
+      } else if (rule.buyout_policy === 'auction') {
+        buyoutTag = '<span class="tag">🔨 Только аукционы</span>';
+      }
+
+      let detailsHtml = `<span class="tag">${typeBadge}</span> <span class="tag">Статус: ${rule.seller_status}</span> ${buyoutTag}`;
 
       if (isRiven) {
         const rerollsText = rule.max_rerolls !== null ? `роллы <= ${rule.max_rerolls}` : '';
@@ -485,6 +493,7 @@
       minRerollsInput.value = rule.min_rerolls ?? '';
       maxRerollsInput.value = rule.max_rerolls ?? '';
       sellerStatusSelect.value = rule.seller_status || 'ingame';
+      buyoutPolicySelect.value = rule.buyout_policy || 'any';
 
       elementSelect.value = rule.element || 'any';
       minDamageInput.value = rule.min_damage ?? '';
@@ -508,6 +517,7 @@
       await fetchMetadata('riven');
       weaponSelect.value = '';
       sellerStatusSelect.value = 'ingame';
+      buyoutPolicySelect.value = 'any';
       elementSelect.value = 'any';
       minDamageInput.value = '';
       ephemeraSelect.value = 'any';
@@ -570,6 +580,7 @@
       min_price: minPriceInput.value ? parseInt(minPriceInput.value, 10) : null,
       max_price: maxPriceInput.value ? parseInt(maxPriceInput.value, 10) : null,
       seller_status: sellerStatusSelect.value,
+      buyout_policy: buyoutPolicySelect.value,
       is_active: true,
       initData: getInitData(),
     };
