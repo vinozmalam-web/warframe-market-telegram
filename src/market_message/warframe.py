@@ -220,7 +220,10 @@ class WarframeMarketClient:
             headers={"User-Agent": "market-message/0.1"},
         )
         if getattr(config, "warframe_jwt_token", ""):
-            self._client.cookies.set("JWT", config.warframe_jwt_token)
+            token = config.warframe_jwt_token
+            self._client.cookies.set("JWT", token, domain=".warframe.market")
+            self._client.cookies.set("JWT", token, domain="api.warframe.market")
+            self._client.cookies.set("JWT", token)
         if getattr(config, "warframe_csrf_token", ""):
             self._csrf_token = config.warframe_csrf_token
 
@@ -230,16 +233,20 @@ class WarframeMarketClient:
     def login(self) -> None:
         jwt_token = getattr(self.config, "warframe_jwt_token", "")
         if jwt_token:
-            self._client.cookies.set("JWT", jwt_token)
+            token = jwt_token
+            self._client.cookies.set("JWT", token, domain=".warframe.market")
+            self._client.cookies.set("JWT", token, domain="api.warframe.market")
+            self._client.cookies.set("JWT", token)
             try:
                 data = self.list_chats()
                 self.current_user_id = extract_user_id_from_chats(data) or "session_user"
                 logger.info("Successfully authenticated to Warframe Market using WARFRAME_MARKET_JWT_TOKEN (user_id=%s)", self.current_user_id)
                 return
             except Exception as exc:
-                logger.warning(
-                    "WARFRAME_MARKET_JWT_TOKEN session check failed (%s); falling back to credentials signin", exc
-                )
+                raise AuthenticationError(
+                    f"WARFRAME_MARKET_JWT_TOKEN session validation failed ({exc}). "
+                    "Please verify that WARFRAME_MARKET_JWT_TOKEN in your .env file is valid and not expired (copy fresh JWT cookie from browser DevTools)."
+                ) from exc
 
         csrf_token = getattr(self.config, "warframe_csrf_token", "")
         if csrf_token:
@@ -247,9 +254,15 @@ class WarframeMarketClient:
         else:
             self._csrf_token = self._fetch_csrf_token()
 
+        if not self.config.warframe_email or not self.config.warframe_password:
+            raise AuthenticationError(
+                "Missing Warframe Market credentials. Please provide WARFRAME_MARKET_JWT_TOKEN or WARFRAME_MARKET_EMAIL / WARFRAME_MARKET_PASSWORD in your .env file."
+            )
+
         payload = {
             "email": self.config.warframe_email,
             "password": self.config.warframe_password,
+            "auth_type": "header",
             "device_id": self.device_id,
         }
         data = self._request("POST", "/auth/signin", json=payload, csrf=True)
@@ -258,7 +271,7 @@ class WarframeMarketClient:
         if not user_id:
             raise WarframeMarketError("Warframe Market sign-in response did not include user id")
         self.current_user_id = str(user_id)
-        logger.info("Logged in to Warframe Market as user id %s", self.current_user_id)
+        logger.info("Logged in to Warframe Market via official API as user id %s", self.current_user_id)
 
     def list_chats(self) -> dict[str, Any]:
         return self._request("GET", "/im/chats")
@@ -458,6 +471,14 @@ class WarframeMarketClient:
         return response
 
     def _fetch_csrf_token(self) -> str:
+        try:
+            init_res = self._send_request("GET", f"{self.config.api_base_url}/auctions/search")
+            jwt_token = self._client.cookies.get("JWT")
+            if jwt_token:
+                return jwt_token
+        except Exception:
+            pass
+
         response = self._send_request("GET", self.config.market_base_url)
         if (
             response.status_code == 403
@@ -488,6 +509,10 @@ class WarframeMarketClient:
         }
         if method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
             headers["Content-Type"] = "application/json"
+        jwt_token = getattr(self.config, "warframe_jwt_token", "")
+        if jwt_token:
+            auth_val = jwt_token if jwt_token.startswith("JWT ") or jwt_token.startswith("Bearer ") else f"JWT {jwt_token}"
+            headers["Authorization"] = auth_val
         if csrf and self._csrf_token:
             headers["X-CSRFToken"] = self._csrf_token
 

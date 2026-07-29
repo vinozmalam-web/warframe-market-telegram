@@ -316,4 +316,30 @@ def test_login_cloudflare_403_raises_descriptive_auth_error(monkeypatch):
     client.close()
 
 
+def test_login_invalid_jwt_raises_explicit_error(monkeypatch):
+    import pytest
+    from market_message.warframe import AuthenticationError
+
+    config = Config(
+        warframe_email="seller@example.com",
+        warframe_password="secret",
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+        warframe_jwt_token="expired_token",
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+
+    def failing_list_chats():
+        raise AuthenticationError("Warframe Market returned 401")
+
+    monkeypatch.setattr(client, "list_chats", failing_list_chats)
+
+    with pytest.raises(AuthenticationError) as exc:
+        client.login()
+
+    assert "WARFRAME_MARKET_JWT_TOKEN session validation failed" in str(exc.value)
+    client.close()
+
+
+
 
