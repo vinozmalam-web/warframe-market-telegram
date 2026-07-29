@@ -509,12 +509,16 @@ class WarframeMarketClient:
         }
         if method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
             headers["Content-Type"] = "application/json"
-        jwt_token = getattr(self.config, "warframe_jwt_token", "")
-        if jwt_token:
-            auth_val = jwt_token if jwt_token.startswith("JWT ") or jwt_token.startswith("Bearer ") else f"JWT {jwt_token}"
+        token = (
+            getattr(self.config, "warframe_jwt_token", "")
+            or self._csrf_token
+            or self._client.cookies.get("JWT", "")
+        )
+        if token:
+            auth_val = token if token.startswith("JWT ") or token.startswith("Bearer ") else f"JWT {token}"
             headers["Authorization"] = auth_val
-        if csrf and self._csrf_token:
-            headers["X-CSRFToken"] = self._csrf_token
+        if csrf and (self._csrf_token or token):
+            headers["X-CSRFToken"] = self._csrf_token or token
 
         if path.startswith("/v2/"):
             base_url = self.config.api_base_url

@@ -341,5 +341,38 @@ def test_login_invalid_jwt_raises_explicit_error(monkeypatch):
     client.close()
 
 
+def test_request_includes_authorization_and_csrf_headers(monkeypatch):
+    config = Config(
+        warframe_email="seller@example.com",
+        warframe_password="secret",
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+    client._csrf_token = "test_csrf_token_abc"
+
+    captured_headers = {}
+
+    class DummyResponse:
+        status_code = 200
+        text = '{"payload": {"user": {"id": "123"}}}'
+        def json(self):
+            return {"payload": {"user": {"id": "123"}}}
+
+    def mock_send_request(method, url, headers=None, **kwargs):
+        nonlocal captured_headers
+        captured_headers = headers or {}
+        return DummyResponse()
+
+    monkeypatch.setattr(client, "_send_request", mock_send_request)
+
+    client._request("POST", "/auth/signin", json={"email": "a", "password": "b"}, csrf=True)
+
+    assert captured_headers.get("X-CSRFToken") == "test_csrf_token_abc"
+    assert captured_headers.get("Authorization") == "JWT test_csrf_token_abc"
+    client.close()
+
+
+
 
 
