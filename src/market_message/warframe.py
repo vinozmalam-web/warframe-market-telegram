@@ -219,12 +219,34 @@ class WarframeMarketClient:
             timeout=config.request_timeout_seconds,
             headers={"User-Agent": "market-message/0.1"},
         )
+        if getattr(config, "warframe_jwt_token", ""):
+            self._client.cookies.set("JWT", config.warframe_jwt_token)
+        if getattr(config, "warframe_csrf_token", ""):
+            self._csrf_token = config.warframe_csrf_token
 
     def close(self) -> None:
         self._client.close()
 
     def login(self) -> None:
-        self._csrf_token = self._fetch_csrf_token()
+        jwt_token = getattr(self.config, "warframe_jwt_token", "")
+        if jwt_token:
+            self._client.cookies.set("JWT", jwt_token)
+            try:
+                data = self.list_chats()
+                self.current_user_id = extract_user_id_from_chats(data) or "session_user"
+                logger.info("Successfully authenticated to Warframe Market using WARFRAME_MARKET_JWT_TOKEN (user_id=%s)", self.current_user_id)
+                return
+            except Exception as exc:
+                logger.warning(
+                    "WARFRAME_MARKET_JWT_TOKEN session check failed (%s); falling back to credentials signin", exc
+                )
+
+        csrf_token = getattr(self.config, "warframe_csrf_token", "")
+        if csrf_token:
+            self._csrf_token = csrf_token
+        else:
+            self._csrf_token = self._fetch_csrf_token()
+
         payload = {
             "email": self.config.warframe_email,
             "password": self.config.warframe_password,
@@ -437,6 +459,16 @@ class WarframeMarketClient:
 
     def _fetch_csrf_token(self) -> str:
         response = self._send_request("GET", self.config.market_base_url)
+        if (
+            response.status_code == 403
+            or "Just a moment..." in response.text
+            or "challenge-platform" in response.text
+        ):
+            raise AuthenticationError(
+                "Warframe Market website (warframe.market) returned 403 Forbidden due to Cloudflare Bot Protection. "
+                "Direct scraping of the CSRF token from warframe.market HTML is blocked by Cloudflare. "
+                "Please set WARFRAME_MARKET_JWT_TOKEN (your browser JWT session cookie) or WARFRAME_MARKET_CSRF_TOKEN in your .env file."
+            )
         response.raise_for_status()
         parser = _CsrfParser()
         parser.feed(response.text)
@@ -468,6 +500,11 @@ class WarframeMarketClient:
             url = f"{self.config.api_base_url}{path}"
         response = self._send_request(method, url, headers=headers, **kwargs)
         if response.status_code in {401, 403}:
+            if "Just a moment..." in response.text or "challenge-platform" in response.text:
+                raise AuthenticationError(
+                    "Warframe Market returned 403 Forbidden (Cloudflare Bot Protection). "
+                    "Please set WARFRAME_MARKET_JWT_TOKEN in your .env file."
+                )
             raise AuthenticationError(f"Warframe Market returned {response.status_code}")
         if response.status_code >= 400:
             raise WarframeMarketError(
@@ -486,6 +523,19 @@ class WarframeMarketClient:
             f"{cookie.name}={cookie.value}"
             for cookie in self._client.cookies.jar
         )
+
+
+def extract_user_id_from_chats(data: dict[str, Any]) -> str | None:
+    if not isinstance(data, dict):
+        return None
+    payload = _unwrap_payload(data)
+    user = payload.get("user") or data.get("user")
+    if isinstance(user, dict) and user.get("id"):
+        return str(user["id"])
+    my_id = payload.get("my_id") or payload.get("current_user_id")
+    if my_id:
+        return str(my_id)
+    return None
 
 
 def extract_chats(data: dict[str, Any]) -> list[ChatSummary]:

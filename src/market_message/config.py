@@ -12,10 +12,12 @@ class ConfigError(ValueError):
 
 @dataclass(frozen=True)
 class Config:
-    warframe_email: str
-    warframe_password: str
-    telegram_bot_token: str
-    telegram_chat_id: str
+    warframe_email: str = ""
+    warframe_password: str = ""
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    warframe_jwt_token: str = ""
+    warframe_csrf_token: str = ""
     poll_interval_seconds: int = 30
     state_path: Path = Path("data/state.sqlite")
     platform: str = "pc"
@@ -39,15 +41,27 @@ class Config:
         values = env or os.environ
         missing: list[str] = []
 
+        warframe_jwt_token = (
+            _get(values, "WARFRAME_MARKET_JWT_TOKEN")
+            or _get(values, "WARFRAME_MARKET_SESSION_TOKEN")
+            or _get(values, "WARFRAME_MARKET_JWT")
+            or ""
+        )
+        warframe_csrf_token = (
+            _get(values, "WARFRAME_MARKET_CSRF_TOKEN")
+            or _get(values, "WARFRAME_MARKET_CSRF")
+            or ""
+        )
+
         warframe_email = _get(values, "WARFRAME_MARKET_EMAIL") or _get(
             values, "WARFRAME_MARKET_LOGIN"
         )
-        if not warframe_email:
-            missing.append("WARFRAME_MARKET_EMAIL or WARFRAME_MARKET_LOGIN")
+        if not warframe_email and not warframe_jwt_token:
+            missing.append("WARFRAME_MARKET_EMAIL or WARFRAME_MARKET_LOGIN (or WARFRAME_MARKET_JWT_TOKEN)")
 
         warframe_password = _get(values, "WARFRAME_MARKET_PASSWORD")
-        if not warframe_password:
-            missing.append("WARFRAME_MARKET_PASSWORD")
+        if not warframe_password and not warframe_jwt_token:
+            missing.append("WARFRAME_MARKET_PASSWORD (or WARFRAME_MARKET_JWT_TOKEN)")
 
         telegram_bot_token = _get(values, "TELEGRAM_BOT_TOKEN")
         if not telegram_bot_token:
@@ -97,6 +111,8 @@ class Config:
             warframe_password=warframe_password or "",
             telegram_bot_token=telegram_bot_token or "",
             telegram_chat_id=telegram_chat_id or "",
+            warframe_jwt_token=warframe_jwt_token,
+            warframe_csrf_token=warframe_csrf_token,
             poll_interval_seconds=poll_interval_seconds,
             state_path=Path(_get(values, "STATE_PATH") or "data/state.sqlite"),
             platform=_get(values, "WARFRAME_MARKET_PLATFORM") or "pc",

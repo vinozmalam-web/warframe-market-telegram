@@ -67,3 +67,17 @@ def test_config_rejects_too_small_poll_interval(monkeypatch):
         Config.from_env()
 
     assert "POLL_INTERVAL_SECONDS" in str(exc.value)
+
+
+def test_config_accepts_jwt_token_without_email(monkeypatch):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("WARFRAME_MARKET_JWT_TOKEN", "jwt_secret_token_123")
+    monkeypatch.setenv("WARFRAME_MARKET_CSRF_TOKEN", "csrf_secret_token_456")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "987654")
+
+    config = Config.from_env()
+
+    assert config.warframe_jwt_token == "jwt_secret_token_123"
+    assert config.warframe_csrf_token == "csrf_secret_token_456"
+

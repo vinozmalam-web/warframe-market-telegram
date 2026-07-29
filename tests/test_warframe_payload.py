@@ -270,3 +270,50 @@ def test_warframe_client_rpm_rate_limiting(monkeypatch):
     assert any(s > 50.0 for s in slept)  # Should sleep ~60 seconds to satisfy 2 RPM limit
 
 
+def test_login_with_jwt_token_bypasses_fetch_csrf(monkeypatch):
+    from market_message.warframe import AuthenticationError
+
+    config = Config(
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+        warframe_jwt_token="valid_jwt_token_123",
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+
+    # Mock list_chats to succeed
+    monkeypatch.setattr(client, "list_chats", lambda: {"payload": {"chats": []}})
+
+    client.login()
+
+    assert client.current_user_id == "session_user"
+    client.close()
+
+
+def test_login_cloudflare_403_raises_descriptive_auth_error(monkeypatch):
+    import pytest
+    from market_message.warframe import AuthenticationError
+
+    config = Config(
+        warframe_email="seller@example.com",
+        warframe_password="secret",
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+
+    class Cloudflare403Response:
+        status_code = 403
+        text = "<!DOCTYPE html><html><head><title>Just a moment...</title></head></html>"
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(client, "_send_request", lambda method, url, **kwargs: Cloudflare403Response())
+
+    with pytest.raises(AuthenticationError) as exc:
+        client.login()
+
+    assert "Cloudflare Bot Protection" in str(exc.value)
+    client.close()
+
+
+
