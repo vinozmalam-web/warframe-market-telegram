@@ -170,7 +170,7 @@ def format_riven_notification(
             val_str = f"{abs(attr.value):.1f}"
             name = format_stat_name(attr.url_name)
             emoji = "✨" if attr.positive else "🔻"
-            attr_lines.append(f"{emoji} <code>{sign}{val_str}% {name}</code>")
+            attr_lines.append(f"{emoji} <b>{sign}{val_str}% {name}</b>")
 
         stats_block = "\n".join(attr_lines) if attr_lines else "<i>Нет характеристик</i>"
         weapon_display = auction.weapon_url_name.replace("_", " ").title() if auction.weapon_url_name and auction.weapon_url_name != "*" else ""
@@ -185,7 +185,7 @@ def format_riven_notification(
         else:
             full_riven_name = (riven_display or weapon_display).title()
 
-        whisper_cmd = f"/w {auction.seller_name} Hi! WTB your [{full_riven_name}] for {auction.buyout_price or auction.starting_price or 0}p (warframe.market)"
+        whisper_cmd = f"/w {auction.seller_name} Hi! WTB your {full_riven_name} for {auction.buyout_price or auction.starting_price or 0}p (warframe.market)"
 
         return (
             f"{header_title}\n"

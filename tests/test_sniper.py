@@ -117,7 +117,7 @@ def test_format_riven_notification():
     assert "Rubico Croni-Crit" in html
     assert "1500 💎" in html
     assert "BestSeller" in html
-    assert "/w BestSeller Hi! WTB your [Rubico Croni-Crit] for 1500p (warframe.market)" in html
+    assert "/w BestSeller Hi! WTB your Rubico Croni-Crit for 1500p (warframe.market)" in html
 
 
 def test_format_riven_notification_sobek_manti_gelimag():
@@ -134,7 +134,7 @@ def test_format_riven_notification_sobek_manti_gelimag():
 
     html = format_riven_notification(auction, rule, "https://warframe.market")
     assert "Sobek Manti-Gelimag" in html
-    assert "/w SobekFan Hi! WTB your [Sobek Manti-Gelimag] for 500p (warframe.market)" in html
+    assert "/w SobekFan Hi! WTB your Sobek Manti-Gelimag for 500p (warframe.market)" in html
 
 
 def test_matches_rule_buyout_policy():
