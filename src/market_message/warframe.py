@@ -271,6 +271,13 @@ class WarframeMarketClient:
         if not user_id:
             raise WarframeMarketError("Warframe Market sign-in response did not include user id")
         self.current_user_id = str(user_id)
+        auth_jwt = self._client.cookies.get("JWT")
+        if auth_jwt:
+            self._authenticated_jwt_token = auth_jwt
+            self._csrf_token = auth_jwt
+            self._client.cookies.set("JWT", auth_jwt, domain=".warframe.market")
+            self._client.cookies.set("JWT", auth_jwt, domain="api.warframe.market")
+            self._client.cookies.set("JWT", auth_jwt)
         logger.info("Logged in to Warframe Market via official API as user id %s", self.current_user_id)
 
     def list_chats(self) -> dict[str, Any]:
@@ -510,9 +517,10 @@ class WarframeMarketClient:
         if method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
             headers["Content-Type"] = "application/json"
         token = (
-            getattr(self.config, "warframe_jwt_token", "")
-            or self._csrf_token
+            getattr(self, "_authenticated_jwt_token", "")
+            or getattr(self.config, "warframe_jwt_token", "")
             or self._client.cookies.get("JWT", "")
+            or self._csrf_token
         )
         if token:
             auth_val = token if token.startswith("JWT ") or token.startswith("Bearer ") else f"JWT {token}"

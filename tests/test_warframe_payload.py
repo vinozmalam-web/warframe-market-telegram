@@ -373,6 +373,42 @@ def test_request_includes_authorization_and_csrf_headers(monkeypatch):
     client.close()
 
 
+def test_login_updates_jwt_token_from_authenticated_cookie(monkeypatch):
+    config = Config(
+        warframe_email="seller@example.com",
+        warframe_password="secret",
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+    client._csrf_token = "anon_token"
+
+    class MockSigninResponse:
+        status_code = 200
+        text = '{"payload": {"user": {"id": "usr_999"}}}'
+        def json(self):
+            return {"payload": {"user": {"id": "usr_999"}}}
+
+    def mock_send_request(method, url, headers=None, **kwargs):
+        if "auctions/search" in url:
+            client._client.cookies.set("JWT", "anon_token")
+            return MockSigninResponse()
+        if "auth/signin" in url:
+            client._client.cookies.set("JWT", "authenticated_jwt_token_123")
+            return MockSigninResponse()
+        return MockSigninResponse()
+
+    monkeypatch.setattr(client, "_send_request", mock_send_request)
+
+    client.login()
+
+    assert client.current_user_id == "usr_999"
+    assert client._authenticated_jwt_token == "authenticated_jwt_token_123"
+    assert client._csrf_token == "authenticated_jwt_token_123"
+    client.close()
+
+
+
 
 
 
