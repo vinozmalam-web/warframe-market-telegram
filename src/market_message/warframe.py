@@ -207,6 +207,7 @@ class WarframeMarketClient:
         self.device_id = device_id
         self.current_user_id: str | None = None
         self._csrf_token: str | None = None
+        self.jwt_expiration_notified: bool = False
         self._rate_limit_lock = threading.Lock()
         self._request_timestamps: list[float] = []
         self._max_rps = getattr(config, "warframe_max_requests_per_second", 3.0)
@@ -240,6 +241,7 @@ class WarframeMarketClient:
             try:
                 data = self.list_chats()
                 self.current_user_id = extract_user_id_from_chats(data) or "session_user"
+                self.jwt_expiration_notified = False
                 logger.info("Successfully authenticated to Warframe Market using WARFRAME_MARKET_JWT_TOKEN (user_id=%s)", self.current_user_id)
                 return
             except Exception as exc:
@@ -278,6 +280,7 @@ class WarframeMarketClient:
             self._client.cookies.set("JWT", auth_jwt, domain=".warframe.market")
             self._client.cookies.set("JWT", auth_jwt, domain="api.warframe.market")
             self._client.cookies.set("JWT", auth_jwt)
+        self.jwt_expiration_notified = False
         logger.info("Logged in to Warframe Market via official API as user id %s", self.current_user_id)
 
     def list_chats(self) -> dict[str, Any]:
@@ -421,6 +424,11 @@ class WarframeMarketClient:
             finally:
                 socket.close()
         except Exception as exc:
+            if isinstance(exc, AuthenticationError):
+                raise
+            status = getattr(exc, "status", getattr(exc, "status_code", None))
+            if status in (401, 403) or any(code in str(exc) for code in ("401", "403", "Unauthorized", "Forbidden")):
+                raise AuthenticationError("Warframe Market WebSocket authentication failed") from exc
             raise WarframeMarketError("Warframe Market WebSocket send failed") from exc
 
     def _rate_limit(self) -> None:

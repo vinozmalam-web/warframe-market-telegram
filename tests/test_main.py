@@ -13,7 +13,7 @@ class FakeTelegramClient:
         self.closed = False
         self.__class__.instances.append(self)
 
-    def send_message(self, text):
+    def send_message(self, text, *args, **kwargs):
         self.sent_messages.append(text)
 
     def close(self):
@@ -28,7 +28,7 @@ class FailingTelegramClient:
         self.closed = False
         self.__class__.instances.append(self)
 
-    def send_message(self, text):
+    def send_message(self, text, *args, **kwargs):
         raise RuntimeError("telegram is down")
 
     def close(self):
@@ -162,3 +162,29 @@ def test_main_redacts_telegram_bot_token_from_http_logs(monkeypatch, tmp_path, c
     assert result == 0
     assert "bot123:secret" not in caplog.text
     assert "bot<redacted>/sendMessage" in caplog.text
+
+
+def test_notify_jwt_expiration_if_needed_sends_once_for_config_token():
+    logger = logging.getLogger("test")
+    config = SimpleNamespace(warframe_jwt_token="old_jwt")
+    warframe = SimpleNamespace(config=config, jwt_expiration_notified=False)
+    telegram = FakeTelegramClient(config)
+
+    app._notify_jwt_expiration_if_needed(warframe, telegram, logger)
+    app._notify_jwt_expiration_if_needed(warframe, telegram, logger)
+
+    assert len(telegram.sent_messages) == 1
+    assert "JWT токен, указанный в конфигурации" in telegram.sent_messages[0]
+    assert warframe.jwt_expiration_notified is True
+
+
+def test_notify_jwt_expiration_if_needed_does_not_send_if_no_config_token():
+    logger = logging.getLogger("test")
+    config = SimpleNamespace(warframe_jwt_token="")
+    warframe = SimpleNamespace(config=config, jwt_expiration_notified=False)
+    telegram = FakeTelegramClient(config)
+
+    app._notify_jwt_expiration_if_needed(warframe, telegram, logger)
+
+    assert len(telegram.sent_messages) == 0
+    assert warframe.jwt_expiration_notified is False

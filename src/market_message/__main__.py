@@ -80,7 +80,7 @@ async def async_main() -> int:
     runner = None
 
     try:
-        await loop.run_in_executor(None, _login_until_success, warframe, getattr(config, "poll_interval_seconds", 30), logger)
+        await loop.run_in_executor(None, _login_until_success, warframe, getattr(config, "poll_interval_seconds", 30), logger, telegram)
         _send_startup_notification(telegram, config, logger)
 
         web_port = getattr(config, "web_port", 8080)
@@ -104,7 +104,8 @@ async def async_main() -> int:
                         logger.info("Sent %s Telegram reply/replies to Warframe Market", reply_count)
                 except AuthenticationError:
                     logger.warning("Warframe Market session expired; logging in again")
-                    await loop.run_in_executor(None, _login_until_success, warframe, poll_interval, logger)
+                    _notify_jwt_expiration_if_needed(warframe, telegram, logger)
+                    await loop.run_in_executor(None, _login_until_success, warframe, poll_interval, logger, telegram)
                 except Exception as exc:
                     if isinstance(exc, KeyboardInterrupt):
                         raise
@@ -186,18 +187,48 @@ def _login_until_success(
     warframe: WarframeMarketClient,
     retry_delay_seconds: int,
     logger: logging.Logger,
+    telegram: TelegramClient | None = None,
 ) -> None:
     while True:
         try:
             warframe.login()
             return
-        except Exception:
+        except Exception as exc:
+            if telegram and (
+                isinstance(exc, AuthenticationError)
+                or "WARFRAME_MARKET_JWT_TOKEN session validation failed" in str(exc)
+            ):
+                _notify_jwt_expiration_if_needed(warframe, telegram, logger)
             logger.exception(
                 "Warframe Market login failed; retrying in %s seconds",
                 retry_delay_seconds,
             )
             import time
             time.sleep(retry_delay_seconds)
+
+
+def _notify_jwt_expiration_if_needed(
+    warframe: WarframeMarketClient,
+    telegram: TelegramClient | None,
+    logger: logging.Logger,
+) -> None:
+    if not telegram:
+        return
+    if not getattr(warframe.config, "warframe_jwt_token", ""):
+        return
+    if getattr(warframe, "jwt_expiration_notified", False):
+        return
+    try:
+        telegram.send_message(
+            "⚠️ <b>Ошибка авторизации Warframe Market</b>\n"
+            "JWT токен, указанный в конфигурации (WARFRAME_MARKET_JWT_TOKEN), истёк или невалиден.\n"
+            "Пожалуйста, обновите токен в файле .env и перезапустите сервис.",
+            parse_mode="HTML",
+        )
+        warframe.jwt_expiration_notified = True
+        logger.warning("Sent one-time Telegram notification about expired config JWT token")
+    except Exception:
+        logger.exception("Failed to send Telegram notification about expired JWT token")
 
 
 if __name__ == "__main__":

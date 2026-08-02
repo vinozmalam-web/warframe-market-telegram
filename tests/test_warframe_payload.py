@@ -408,6 +408,30 @@ def test_login_updates_jwt_token_from_authenticated_cookie(monkeypatch):
     client.close()
 
 
+def test_send_chat_message_raises_auth_error_on_401(monkeypatch):
+    import pytest
+    from market_message.warframe import AuthenticationError
+
+    class FakeWebsocketModule:
+        def create_connection(self, *args, **kwargs):
+            err = Exception("Handshake status 401 Unauthorized")
+            err.status_code = 401
+            raise err
+
+    monkeypatch.setitem(sys.modules, "websocket", FakeWebsocketModule())
+    config = Config(
+        warframe_jwt_token="expired",
+        telegram_bot_token="123:token",
+        telegram_chat_id="987654",
+    )
+    client = WarframeMarketClient(config, device_id="device-id")
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        client.send_chat_message("chat-1", "reply text")
+
+    assert "Warframe Market WebSocket authentication failed" in str(exc_info.value)
+    client.close()
+
 
 
 
