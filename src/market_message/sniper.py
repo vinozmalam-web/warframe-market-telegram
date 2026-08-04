@@ -196,7 +196,7 @@ def format_riven_notification(
             f"🔄 <b>Роллы</b>: {auction.rerolls} | <b>MR</b>: {auction.mastery_rank} | <b>Полярность</b>: {auction.polarity.title()}\n\n"
             f"📊 <b>Характеристики</b>:\n{stats_block}\n\n"
             f"💬 <b>Нажми, чтобы скопировать шёпот</b>:\n"
-            f"<pre><code>{_escape_html(whisper_cmd)}</code></pre>\n\n"
+            f"<code>{_escape_html(whisper_cmd)}</code>\n\n"
             f"🔗 <a href=\"{auction_url}\">Открыть на Warframe.Market</a>"
         )
     else:
@@ -221,7 +221,7 @@ def format_riven_notification(
             f"💰 <b>Цена</b>: <b>{price_str}</b>\n"
             f"👤 <b>Продавец</b>: {status_emoji} <b>{_escape_html(auction.seller_name)}</b> ({auction.seller_status})\n\n"
             f"💬 <b>Нажми, чтобы скопировать шёпот</b>:\n"
-            f"<pre><code>{_escape_html(whisper_cmd)}</code></pre>\n\n"
+            f"<code>{_escape_html(whisper_cmd)}</code>\n\n"
             f"🔗 <a href=\"{auction_url}\">Открыть на Warframe.Market</a>"
         )
 

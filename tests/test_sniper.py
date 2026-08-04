@@ -117,7 +117,8 @@ def test_format_riven_notification():
     assert "Rubico Croni-Crit" in html
     assert "1500 💎" in html
     assert "BestSeller" in html
-    assert "/w BestSeller Hi! WTB your Rubico Croni-Crit for 1500p (warframe.market)" in html
+    assert "<code>/w BestSeller Hi! WTB your Rubico Croni-Crit for 1500p (warframe.market)</code>" in html
+    assert "<pre>" not in html
 
 
 def test_format_riven_notification_sobek_manti_gelimag():
@@ -568,7 +569,8 @@ def test_format_lich_sister_notification():
     assert "Cold (60.0%)" in html
     assert "Да ✨" in html
     assert "Pyromaniac" in html
-    assert "/w SisterHunter Hi! WTB your [Tenet Envoy] (Cold 60.0%) for 400p" in html
+    assert "<code>/w SisterHunter Hi! WTB your [Tenet Envoy] (Cold 60.0%) for 400p (warframe.market)</code>" in html
+    assert "<pre>" not in html
 
 
 
